@@ -1,0 +1,56 @@
+/* Three-column app grid: header / sidebar + main.
+ * Header is sticky at the top; sidebar is sticky on the left.
+ */
+body {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  grid-template-rows: 56px 1fr;
+  grid-template-areas:
+    "header header"
+    "side   main";
+  min-height: 100vh;
+}
+.app-header {
+  grid-area: header;
+  display: flex; align-items: center; gap: 16px;
+  padding: 0 16px;
+  background: linear-gradient(180deg, rgba(10,61,240,.10), transparent 70%), var(--ink-2);
+  border-bottom: 1px solid var(--rule);
+  position: sticky; top: 0; z-index: 50;
+}
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand-mark { width: 36px; height: 36px; }
+.brand-text { display: flex; flex-direction: column; line-height: 1.1; }
+.brand-text strong { font-size: 14px; letter-spacing: .02em; }
+.brand-text span   { font: 10px var(--mono); color: var(--muted); letter-spacing: .14em; }
+
+.header-tabs { display: none; }  /* sidebar carries the tabs on desktop */
+.header-status { margin-left: auto; display: flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 12px; color: var(--paper-2); }
+
+.app-sidebar {
+  grid-area: side;
+  background: var(--ink-2);
+  border-right: 1px solid var(--rule);
+  display: flex; flex-direction: column;
+  position: sticky; top: 56px; height: calc(100vh - 56px);
+  overflow: hidden;
+}
+.app-sidebar .side-tabs { flex: 1; overflow-y: auto; }
+.side-foot {
+  border-top: 1px solid var(--rule); padding: 10px 12px; font: 11px var(--mono); color: var(--paper-2);
+  display: flex; flex-direction: column; gap: 4px;
+}
+.side-foot-row { display: flex; justify-content: space-between; }
+
+.app-main { grid-area: main; padding: 18px; overflow: auto; }
+.tab { display: none; }
+.tab.is-active { display: block; animation: tabIn .18s ease; }
+@keyframes tabIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+#vizCanvas { display: block; width: 100%; height: auto; background: #000; border-radius: var(--radius); }
+
+@media (max-width: 760px) {
+  body { grid-template-columns: 1fr; grid-template-areas: "header" "main"; }
+  .app-sidebar { display: none; }
+  .header-tabs { display: flex; gap: 4px; overflow-x: auto; }
+}

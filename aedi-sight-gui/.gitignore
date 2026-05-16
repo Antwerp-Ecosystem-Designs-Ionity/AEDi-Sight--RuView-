@@ -1,0 +1,20 @@
+# AEDi-Sight RuView GUI — ignore runtime + build artefacts
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+dist/
+build/
+*.egg-info/
+
+# runtime state
+var/
+*.log
+
+# editor noise
+.vscode/
+.idea/
+*.swp
+.DS_Store

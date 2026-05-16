@@ -8,6 +8,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`aedi-sight-gui/` — cross-platform sensing console (IONITY edition).**
+  New Python + vanilla-JS application that wraps the WiFi-CSI · ESP32 · ML
+  pipeline behind a single web UI. One process binds HTTP (`:8088`) and the UDP
+  CSI ingest (`:5005`); a single `/ws` multiplex carries `csi`, `log`,
+  `provision`, `fleet`, `ml`, `chat` topics. Tabs: Home · Provision · Sink ·
+  Visualizer · ML · Chat · Tools · Logs · Updates · About.
+  - **Provision** tab + backend wraps `python -m esptool ... write_flash`
+    (optional) and `firmware/esp32-csi-node/provision.py` with full mesh-aware
+    arguments — `--node-id 0..7`, `--tdm-slot 0..7`, `--tdm-total 8`,
+    `--channel`, `--edge-tier`, `--filter-mac`, `--dry-run`. "Plan fleet"
+    button auto-suggests the next free node-id from the live fleet table.
+  - **Sink** decodes ADR-018 binary CSI frames (magic `0xC5110001`, 20 B header
+    + `n_ant×n_sc` int8 I/Q) and republishes amplitude + phase over the WS
+    bus, rate-limited to ~10 Hz per node. Per-node stats: source, frames,
+    rolling 5-s rate, RSSI, last seq, last seen.
+  - **Visualizer** renders a scrolling subcarrier waterfall in canvas
+    (amplitude · phase · amp Δ modes).
+  - **Chat** is terminal-style; bridges to `claude-flow` CLI when
+    `ANTHROPIC_API_KEY` is set, falls back to local `/help`, `/ip`, `/ports`,
+    `/fleet`, `/status`, `/git status` commands.
+  - **Launcher scripts** — `launch.sh` (Linux/macOS), `launch.bat` +
+    `launch.ps1` (Windows). IONITY truecolor ANSI splash via
+    `aedi_sight.ansi`. Self-installs missing pip deps to the user site
+    (idempotent).
+  - **Installer** — `install.sh` / `install.ps1` clones the repo, installs
+    deps, drops a `~/.local/bin/aedi-sight` shim, writes a `.desktop` entry on
+    Linux / Start-menu shortcut on Windows.
+  - **Watchdog** — `--watchdog` flag re-spawns the server on any non-zero exit
+    with 1.6× backoff capped at 30 s.
+  - **REST API** — `/api/status`, `/api/serial-ports`, `/api/provision`,
+    `/api/sink/{start,stop,reset,stats}`, `/api/fleet`, `/api/ml/{models,job}`,
+    `/api/chat`, `/api/logs/recent`, `/api/git/{status,pull,fetch,log}`,
+    `/api/changelog`, `/api/tools`.
+  - **Theme** blue / white / black, animated SVG intro veil, SVG favicon.
+  - **License** MIT + IONITY Policy 986 / 900 / 990 AED addendum
+    (`aedi-sight-gui/LICENSE`). Author Johan Wilhelm van Antwerp · Antwerp
+    Designs 2018 – 2026.
 - **Real-time CSI introspection / low-latency tap on `wifi-densepose-sensing-server` (ADR-099).**
   New `wifi_densepose_sensing_server::introspection` module wires
   [midstream](https://github.com/ruvnet/midstream)'s `temporal-attractor` (Lyapunov +

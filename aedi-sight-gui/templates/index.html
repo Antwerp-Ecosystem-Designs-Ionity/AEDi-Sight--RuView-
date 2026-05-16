@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AEDi-Sight RuView — IONITY</title>
+  <meta name="description" content="WiFi-CSI sensing control surface — provisioning, sink, ML, chat, updates. IONITY / Antwerp Designs." />
+  <link rel="icon" type="image/svg+xml" href="/static/img/favicon.svg" />
+  <link rel="stylesheet" href="/static/css/theme.css" />
+  <link rel="stylesheet" href="/static/css/layout.css" />
+</head>
+<body>
+  <div id="intro-veil" class="intro-veil">
+    <div class="intro-inner">
+      <svg viewBox="0 0 600 200" class="intro-logo" aria-label="IONITY">
+        <defs>
+          <linearGradient id="ig-blue" x1="0" x2="1">
+            <stop offset="0" stop-color="#0a3df0" />
+            <stop offset="0.5" stop-color="#3a8bff" />
+            <stop offset="1" stop-color="#0a3df0" />
+          </linearGradient>
+          <linearGradient id="ig-pulse" x1="0" x2="1">
+            <stop offset="0" stop-color="#ffffff" stop-opacity="0" />
+            <stop offset="0.5" stop-color="#ffffff" stop-opacity="0.9" />
+            <stop offset="1" stop-color="#ffffff" stop-opacity="0" />
+          </linearGradient>
+        </defs>
+        <text x="300" y="120" text-anchor="middle" class="intro-word" fill="url(#ig-blue)">IONITY</text>
+        <rect x="40" y="155" width="520" height="2" fill="url(#ig-pulse)" class="intro-pulse" />
+        <text x="300" y="180" text-anchor="middle" class="intro-tag">AEDi-Sight RuView · WiFi-CSI Sensing Console</text>
+      </svg>
+      <div class="intro-prog"><div class="intro-prog-bar" id="introProg"></div></div>
+      <div class="intro-meta">
+        <span id="introStep">booting</span>
+        <span class="dim">·</span>
+        <span class="dim">Antwerp Designs · 2018 – 2026</span>
+      </div>
+    </div>
+  </div>
+
+  <header class="app-header">
+    <div class="brand">
+      <svg class="brand-mark" viewBox="0 0 48 48" aria-label="IONITY mark">
+        <circle cx="24" cy="24" r="22" fill="none" stroke="#0a3df0" stroke-width="2" />
+        <circle cx="24" cy="24" r="14" fill="none" stroke="#ffffff" stroke-width="1.5" />
+        <circle cx="24" cy="24" r="6"  fill="#0a3df0" />
+        <line x1="24" y1="2"  x2="24" y2="46" stroke="#ffffff" stroke-width="0.8" stroke-dasharray="2 3" />
+        <line x1="2"  y1="24" x2="46" y2="24" stroke="#ffffff" stroke-width="0.8" stroke-dasharray="2 3" />
+      </svg>
+      <div class="brand-text">
+        <strong>AEDi-Sight</strong>
+        <span>RuView · IONITY</span>
+      </div>
+    </div>
+    <nav class="header-tabs" id="headerTabs"></nav>
+    <div class="header-status">
+      <span class="status-dot" id="sinkDot" title="sink"></span>
+      <span id="sinkFps">0.0 fps</span>
+      <span class="dim">·</span>
+      <span id="piIp">—</span>
+      <span class="dim">·</span>
+      <span id="buildVer">v0.1</span>
+    </div>
+  </header>
+
+  <aside class="app-sidebar">
+    <ul id="sideTabs" class="side-tabs"></ul>
+    <div class="side-foot">
+      <div class="side-foot-row"><span class="dim">esp32</span><span id="espState">unknown</span></div>
+      <div class="side-foot-row"><span class="dim">ws</span><span id="wsState">—</span></div>
+      <div class="side-foot-row"><span class="dim">uptime</span><span id="upTime">—</span></div>
+    </div>
+  </aside>
+
+  <main class="app-main">
+    <!-- Tabs are rendered dynamically by app.js — each section is a <section data-tab="..."> -->
+
+    <section data-tab="home" class="tab is-active">
+      <div class="hero">
+        <h1>Sensing without cameras.</h1>
+        <p class="sub">8-node ESP32-S3 TDMA mesh · channel-state radar · pose, vitals, presence.</p>
+        <div class="quick">
+          <button class="btn primary" data-go="provision">Provision a node</button>
+          <button class="btn" data-go="sink">Start the sink</button>
+          <button class="btn" data-go="visualizer">Open visualizer</button>
+          <button class="btn ghost" data-go="chat">Talk to Claude</button>
+        </div>
+      </div>
+      <div class="cards">
+        <div class="card">
+          <h3>What this is</h3>
+          <p>One cross-platform console for the AEDi-Sight RuView WiFi-CSI stack. Flash and provision ESP32 nodes (1 of 8 → 8 of 8), watch the live UDP/WS sink, plot the per-subcarrier heatmap, train models, and pull repo updates — all without leaving the page.</p>
+        </div>
+        <div class="card">
+          <h3>How a frame travels</h3>
+          <ol class="mini">
+            <li>ESP32 captures CSI via promiscuous-mode callback (192 subcarriers @ ch 11).</li>
+            <li>Frame serialized to ADR-018 (20 B header + I/Q int8) over UDP :5005.</li>
+            <li>Sink ingests, broadcasts JSON over WebSocket.</li>
+            <li>Visualizer renders subcarrier amplitude per frame.</li>
+          </ol>
+        </div>
+        <div class="card">
+          <h3>Mesh multiplex</h3>
+          <p>Each node owns a TDM slot 0..7 of an 8-slot cycle (≈ 4 ms TX + 30 ms processing).
+             Per-slot one node transmits and seven receive — over a full cycle every node does both.
+             Configure slot + node-id from the Provisioning tab.</p>
+        </div>
+      </div>
+    </section>
+
+    <section data-tab="provision" class="tab">
+      <header class="tab-head">
+        <h2>Provision a node</h2>
+        <p class="sub">Two-step: <em>flash firmware once</em>, then <em>write NVS config</em>. Re-running NVS write replaces the whole <code>csi_cfg</code> namespace (issue&nbsp;#391) — pass every key you want kept.</p>
+      </header>
+      <div class="grid-2col">
+        <form id="provForm" class="form">
+          <fieldset>
+            <legend>Serial</legend>
+            <label>Port
+              <select name="port" id="provPort"></select>
+              <button type="button" class="btn xs" id="rescanPorts">rescan</button>
+            </label>
+            <label class="row">
+              <input type="checkbox" name="flash_firmware" id="provFlash" />
+              <span>Also flash firmware (one-time per device)</span>
+            </label>
+            <label>Firmware variant
+              <select name="firmware_variant" id="provVariant">
+                <option value="8mb">8 MB (full features — recommended)</option>
+                <option value="4mb">4 MB (compact, no display task)</option>
+              </select>
+            </label>
+          </fieldset>
+          <fieldset>
+            <legend>Wi-Fi · Sink</legend>
+            <label>SSID <input name="ssid" id="provSsid" required autocomplete="off" placeholder="Antwerp Ionity"/></label>
+            <label>Password <input name="password" id="provPwd" type="password" required autocomplete="off"/></label>
+            <label>Sink IP <input name="target_ip" id="provIp" required autocomplete="off"/></label>
+            <label>Sink port <input name="target_port" id="provPort2" type="number" value="5005" required/></label>
+            <label>Channel
+              <select name="channel" id="provChannel">
+                <option value="1">1 (2.412 GHz)</option><option value="6">6 (2.437 GHz)</option>
+                <option value="11" selected>11 (2.462 GHz)</option>
+                <option value="">auto (no override)</option>
+              </select>
+            </label>
+          </fieldset>
+          <fieldset>
+            <legend>Mesh · multiplex</legend>
+            <label>Node ID
+              <select name="node_id" id="provNodeId">
+                <option>0</option><option>1</option><option>2</option><option>3</option>
+                <option>4</option><option>5</option><option>6</option><option>7</option>
+              </select>
+            </label>
+            <label>TDM slot
+              <select name="tdm_slot" id="provTdmSlot">
+                <option>0</option><option>1</option><option>2</option><option>3</option>
+                <option>4</option><option>5</option><option>6</option><option>7</option>
+              </select>
+            </label>
+            <label>TDM total
+              <input name="tdm_total" id="provTdmTotal" type="number" min="2" max="32" value="8" />
+            </label>
+            <label>Edge tier
+              <select name="edge_tier" id="provEdge">
+                <option value="0">0 · raw passthrough (recommended)</option>
+                <option value="1">1 · stats</option>
+                <option value="2">2 · vitals</option>
+              </select>
+            </label>
+            <label>Filter MAC (optional)
+              <input name="filter_mac" id="provFilter" placeholder="AA:BB:CC:DD:EE:FF" />
+            </label>
+          </fieldset>
+          <div class="form-actions">
+            <button type="submit" class="btn primary" id="provSubmit">Provision node</button>
+            <button type="button" class="btn ghost" id="provDryRun">Dry-run (build NVS only)</button>
+            <button type="button" class="btn ghost" id="provFleet">Plan fleet (0 → 7)</button>
+          </div>
+        </form>
+        <div class="form-side">
+          <div class="card">
+            <h3>Fleet status</h3>
+            <table class="fleet">
+              <thead><tr><th>#</th><th>Status</th><th>Last seen</th><th>RSSI</th></tr></thead>
+              <tbody id="fleetTable"></tbody>
+            </table>
+          </div>
+          <div class="card">
+            <h3>Live log</h3>
+            <pre id="provLog" class="log"></pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section data-tab="sink" class="tab">
+      <header class="tab-head"><h2>Sink</h2><p class="sub">UDP :5005 ingest, ADR-018 frame parser, per-node stats.</p></header>
+      <div class="cards row">
+        <div class="card">
+          <h3>Control</h3>
+          <div class="row gap"><button class="btn primary" id="sinkStart">Start sink</button>
+                              <button class="btn" id="sinkStop">Stop</button>
+                              <button class="btn ghost" id="sinkReset">Reset stats</button></div>
+          <div class="kv"><span>Listening</span><span id="sinkBind">—</span></div>
+          <div class="kv"><span>WS clients</span><span id="wsClients">0</span></div>
+          <div class="kv"><span>Frames seen</span><span id="sinkTotal">0</span></div>
+          <div class="kv"><span>Last frame</span><span id="sinkLast">—</span></div>
+        </div>
+        <div class="card flex2">
+          <h3>Per-node</h3>
+          <table class="fleet">
+            <thead><tr><th>Node</th><th>Source</th><th>Frames</th><th>Rate</th><th>RSSI</th><th>Last seq</th><th>Last seen</th></tr></thead>
+            <tbody id="nodeTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section data-tab="visualizer" class="tab">
+      <header class="tab-head"><h2>Visualizer</h2><p class="sub">CSI subcarrier waterfall · amplitude per subcarrier · most recent 256 frames.</p></header>
+      <div class="cards">
+        <div class="card pad0">
+          <canvas id="vizCanvas" width="1024" height="384"></canvas>
+        </div>
+        <div class="card row gap">
+          <label>Node
+            <select id="vizNode"><option value="">all</option></select>
+          </label>
+          <label>Mode
+            <select id="vizMode">
+              <option value="amp">amplitude</option>
+              <option value="phase">phase</option>
+              <option value="diff">amp Δ</option>
+            </select>
+          </label>
+          <label>Gain <input type="range" min="0.2" max="4" step="0.1" value="1" id="vizGain" /></label>
+          <button class="btn xs" id="vizPause">pause</button>
+        </div>
+      </div>
+    </section>
+
+    <section data-tab="ml" class="tab">
+      <header class="tab-head"><h2>ML</h2><p class="sub">Local + cloud training and inference. Models are RVF containers (signed, ed25519).</p></header>
+      <div class="cards">
+        <div class="card">
+          <h3>Local models</h3>
+          <table class="fleet"><thead><tr><th>Name</th><th>Size</th><th>Modified</th><th></th></tr></thead><tbody id="mlModels"></tbody></table>
+          <button class="btn xs" id="mlRefresh">refresh</button>
+        </div>
+        <div class="card">
+          <h3>Train</h3>
+          <div class="row gap">
+            <button class="btn" data-mljob="contrastive">Contrastive pretrain</button>
+            <button class="btn" data-mljob="pose">Pose head fine-tune</button>
+            <button class="btn ghost" data-mljob="benchmark">Bench vital signs</button>
+          </div>
+          <pre id="mlLog" class="log"></pre>
+        </div>
+        <div class="card">
+          <h3>Inference</h3>
+          <div class="row gap">
+            <button class="btn" id="mlInferStart">Start inference</button>
+            <button class="btn" id="mlInferStop">Stop</button>
+          </div>
+          <div class="kv"><span>Output</span><span id="mlOut">idle</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section data-tab="chat" class="tab">
+      <header class="tab-head"><h2>Chat</h2><p class="sub">Terminal-style. Bridges to <code>claude-flow</code> CLI when available; otherwise local echo + script tools.</p></header>
+      <div class="terminal" id="chatTerm">
+        <pre id="chatLog" class="log term"></pre>
+        <form id="chatForm" class="chat-form">
+          <span class="prompt">aedi&nbsp;»</span>
+          <input id="chatInput" autocomplete="off" placeholder="ask Claude or run a /command — /help" />
+          <button class="btn xs primary">send</button>
+        </form>
+      </div>
+    </section>
+
+    <section data-tab="logs" class="tab">
+      <header class="tab-head"><h2>Logs</h2><p class="sub">Live tail of the app log.</p></header>
+      <div class="card pad0"><pre id="logTail" class="log term"></pre></div>
+    </section>
+
+    <section data-tab="tools" class="tab">
+      <header class="tab-head"><h2>Tools</h2><p class="sub">The repo's scripts, grouped. Click to run; output streams to Logs.</p></header>
+      <div class="cards" id="toolCards"></div>
+    </section>
+
+    <section data-tab="updates" class="tab">
+      <header class="tab-head"><h2>Updates</h2><p class="sub">Git status · pull · changelog · self-update.</p></header>
+      <div class="cards">
+        <div class="card">
+          <h3>Repo</h3>
+          <div class="kv"><span>Branch</span><span id="gitBranch">—</span></div>
+          <div class="kv"><span>HEAD</span><span id="gitHead">—</span></div>
+          <div class="kv"><span>Behind</span><span id="gitBehind">—</span></div>
+          <div class="row gap">
+            <button class="btn primary" id="gitPull">Pull updates</button>
+            <button class="btn" id="gitFetch">Fetch</button>
+            <button class="btn ghost" id="gitOpenLog">git log -n 10</button>
+          </div>
+          <pre id="gitOut" class="log"></pre>
+        </div>
+        <div class="card">
+          <h3>CHANGELOG</h3>
+          <pre id="changelog" class="log"></pre>
+        </div>
+      </div>
+    </section>
+
+    <section data-tab="about" class="tab">
+      <header class="tab-head"><h2>About</h2></header>
+      <div class="cards">
+        <div class="card">
+          <h3>AEDi-Sight RuView · IONITY edition</h3>
+          <p>Cross-platform sensing console for the WiFi-CSI · ESP32-S3 TDMA mesh.</p>
+          <ul class="mini">
+            <li>Author · <strong>Johan Wilhelm van Antwerp</strong></li>
+            <li>IONITY · <a href="https://www.ionity.today" target="_blank">ionity.today</a> · <a href="https://ionity.world" target="_blank">ionity.world</a></li>
+            <li>Antwerp Designs · 2018 – 2026</li>
+            <li>Theme · BLUE · WHITE · BLACK</li>
+          </ul>
+          <p class="dim">All rights reserved · Policy 986 AED license · 900 / 990 AED · MIT where applicable.</p>
+        </div>
+        <div class="card">
+          <h3>Stack</h3>
+          <ul class="mini">
+            <li>Backend · Python 3 · aiohttp · websockets · pyserial</li>
+            <li>Frontend · vanilla JS · canvas · SVG · CSS custom-properties</li>
+            <li>ESP32 firmware · pre-built (see <code>firmware/esp32-csi-node/release_bins/</code>)</li>
+            <li>Sink protocol · ADR-018 binary CSI · UDP :5005</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script type="module" src="/static/js/app.js"></script>
+</body>
+</html>
