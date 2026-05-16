@@ -52,6 +52,11 @@ STARTED = time.time()
 # ─── HTTP handlers ──────────────────────────────────────────────────────────
 
 async def index(_request: web.Request) -> web.Response:
+    # Prefer the React bundle when it's been built (static/dist/index.html).
+    dist_index = SETTINGS.static_dir / "dist" / "index.html"
+    if dist_index.exists():
+        return web.Response(body=dist_index.read_bytes(), content_type="text/html",
+                            headers={"Cache-Control": "no-cache"})
     p = SETTINGS.template_dir / "index.html"
     return web.Response(body=p.read_bytes(), content_type="text/html",
                         headers={"Cache-Control": "no-cache"})

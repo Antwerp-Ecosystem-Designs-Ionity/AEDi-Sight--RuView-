@@ -124,6 +124,17 @@ python3 -m pip install --user --break-system-packages \
   }
 ok "deps installed"
 
+# ── Build the React bundle if Node/npm are present ───────────────────────
+if [ -d "$GUI_DIR/web" ] && command -v npm >/dev/null 2>&1 && command -v node >/dev/null 2>&1; then
+  say "→ building React bundle"
+  (cd "$GUI_DIR/web" && npm install --no-bin-links --no-audit --no-fund >/tmp/aedi-npm.log 2>&1 \
+                    && node ./node_modules/vite/bin/vite.js build >/tmp/aedi-vite.log 2>&1) \
+    && ok "React bundle built" \
+    || warn "React build failed (logs: /tmp/aedi-npm.log /tmp/aedi-vite.log) — vanilla-JS fallback will be used"
+else
+  hint "node/npm not found — using vanilla-JS UI"
+fi
+
 # ── 4. user-facing shims ──────────────────────────────────────────────────
 mkdir -p "$HOME/.local/bin"
 cat > "$HOME/.local/bin/aedi-sight" <<EOF

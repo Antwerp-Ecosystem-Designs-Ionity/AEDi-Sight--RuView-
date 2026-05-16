@@ -39,6 +39,28 @@ if [ "${AEDI_AUTO_UPDATE:-0}" = "1" ]; then
   fi
 fi
 
+# Auto-build the React bundle (web/) if Node is available and there's no
+# dist/ yet. Skip with `AEDI_SKIP_WEB_BUILD=1` for the vanilla-JS fallback.
+if [ "${AEDI_SKIP_WEB_BUILD:-0}" != "1" ] && [ -d "$PWD/web" ] && [ ! -f "$PWD/static/dist/index.html" ]; then
+  if command -v node >/dev/null 2>&1 && command -v npm >/dev/null 2>&1; then
+    echo "→ building React bundle (first run; future starts will skip)"
+    pushd "$PWD/web" >/dev/null
+    if [ ! -d node_modules ]; then
+      npm install --no-bin-links --no-audit --no-fund >/tmp/aedi-npm.log 2>&1 || {
+        echo "  npm install failed (see /tmp/aedi-npm.log) — falling back to vanilla JS"
+      }
+    fi
+    if [ -d node_modules ]; then
+      node ./node_modules/vite/bin/vite.js build >/tmp/aedi-vite.log 2>&1 \
+        && echo "  ok — bundled $(ls -1 ../static/dist/assets/*.js 2>/dev/null | head -1)" \
+        || echo "  vite build failed (see /tmp/aedi-vite.log) — falling back to vanilla JS"
+    fi
+    popd >/dev/null
+  else
+    echo "→ node/npm not found — running with vanilla-JS fallback"
+  fi
+fi
+
 # Splash via the package
 PYTHONPATH="$PWD:${PYTHONPATH:-}" "$PY" -m aedi_sight.ansi || true
 
