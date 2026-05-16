@@ -1,5 +1,6 @@
 // ML tab — wires the live per-node anomaly table to the LocalML server module.
 import { wsBus } from '../wsbus.js';
+import { push as sparkPush, paint as sparkPaint } from '../spark.js';
 
 export function initML() {
   const $ = sel => document.querySelector(sel);
@@ -23,18 +24,24 @@ export function initML() {
     const now = Date.now()/1000;
     for (const id of ids) {
       const n = nodeState[id];
-      const cls = n.state === 'spike' ? 'err' :
-                  n.state === 'moving' ? 'warn' :
-                  n.state === 'idle'   ? 'ok'   : '';
+      sparkPush('mlscore-' + id, n.score || 0);
+      const chip = n.state === 'spike'  ? '<span class="chip err">spike</span>' :
+                   n.state === 'moving' ? '<span class="chip warn">moving</span>' :
+                   n.state === 'idle'   ? '<span class="chip ok">idle</span>'   :
+                                          '<span class="chip dim">calib</span>';
       const since = n.since ? `${(now - n.since).toFixed(0)}s` : '—';
       const tr = document.createElement('tr');
       tr.innerHTML = `<td class="mono">#${id}</td>
-                      <td class="${cls}">${n.state}</td>
-                      <td class="mono">${(n.score || 0).toFixed(2)}</td>
+                      <td>${chip}</td>
+                      <td><canvas class="spark" id="mlspark-${id}" width="80" height="22"></canvas> <span class="mono">${(n.score || 0).toFixed(2)}σ</span></td>
                       <td class="mono">${n.rssi ?? '—'}</td>
                       <td class="mono">${n.samples}</td>
                       <td class="mono">${since}</td>`;
       tb.appendChild(tr);
+      requestAnimationFrame(() => {
+        const colour = n.state === 'spike' ? '#ff5470' : n.state === 'moving' ? '#ffb547' : n.state === 'idle' ? '#28d68a' : '#5e6779';
+        sparkPaint(document.getElementById(`mlspark-${id}`), 'mlscore-' + id, { stroke: colour });
+      });
     }
   }
 

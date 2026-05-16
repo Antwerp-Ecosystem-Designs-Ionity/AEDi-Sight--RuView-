@@ -1,56 +1,99 @@
-/* Three-column app grid: header / sidebar + main.
- * Header is sticky at the top; sidebar is sticky on the left.
- */
+/* Shell layout — header / sidebar / main with proper sticky behaviour. */
+
 body {
   display: grid;
-  grid-template-columns: 220px 1fr;
-  grid-template-rows: 56px 1fr;
+  grid-template-columns: 248px 1fr;
+  grid-template-rows: 64px 1fr;
   grid-template-areas:
     "header header"
     "side   main";
   min-height: 100vh;
 }
+
+/* ── header ─────────────────────────────────────────────────── */
 .app-header {
   grid-area: header;
-  display: flex; align-items: center; gap: 16px;
-  padding: 0 16px;
-  background: linear-gradient(180deg, rgba(10,61,240,.10), transparent 70%), var(--ink-2);
+  display: flex; align-items: center; gap: 18px;
+  padding: 0 20px;
+  background: linear-gradient(180deg, var(--ink-800) 0%, var(--ink-900) 100%);
   border-bottom: 1px solid var(--rule);
   position: sticky; top: 0; z-index: 50;
+  backdrop-filter: saturate(140%) blur(8px);
 }
-.brand { display: flex; align-items: center; gap: 10px; }
-.brand-mark { width: 36px; height: 36px; }
-.brand-text { display: flex; flex-direction: column; line-height: 1.1; }
-.brand-text strong { font-size: 14px; letter-spacing: .02em; }
-.brand-text span   { font: 10px var(--mono); color: var(--muted); letter-spacing: .14em; }
+.brand { display: flex; align-items: center; gap: 12px; }
+.brand-mark { width: 40px; height: 40px; flex-shrink: 0; }
+.brand-text { display: flex; flex-direction: column; line-height: 1.05; }
+.brand-text strong { font: 700 14.5px var(--sans); letter-spacing: -0.005em; color: #fff; }
+.brand-text span   { font: 500 10px var(--mono); color: var(--paper-400); letter-spacing: 0.18em; text-transform: uppercase; }
 
-.header-tabs { display: none; }  /* sidebar carries the tabs on desktop */
-.header-status { margin-left: auto; display: flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 12px; color: var(--paper-2); }
+.header-tabs { display: none; }
+.header-status {
+  margin-left: auto;
+  display: flex; align-items: center; gap: 12px;
+  font: 500 12px var(--mono); color: var(--paper-200);
+}
+.header-status .pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px; border-radius: var(--r-pill);
+  background: rgba(255,255,255,0.04); border: 1px solid var(--rule);
+}
+.header-status .sep { color: var(--paper-500); }
 
+/* ── sidebar ────────────────────────────────────────────────── */
 .app-sidebar {
   grid-area: side;
-  background: var(--ink-2);
+  background: linear-gradient(180deg, var(--ink-800), var(--ink-900) 60%);
   border-right: 1px solid var(--rule);
   display: flex; flex-direction: column;
-  position: sticky; top: 56px; height: calc(100vh - 56px);
+  position: sticky; top: 64px; height: calc(100vh - 64px);
   overflow: hidden;
 }
-.app-sidebar .side-tabs { flex: 1; overflow-y: auto; }
+.app-sidebar .side-tabs { flex: 1; overflow-y: auto; padding-bottom: 14px; }
 .side-foot {
-  border-top: 1px solid var(--rule); padding: 10px 12px; font: 11px var(--mono); color: var(--paper-2);
-  display: flex; flex-direction: column; gap: 4px;
+  border-top: 1px solid var(--rule); padding: 12px 14px;
+  font: 11px var(--mono); color: var(--paper-300);
+  display: flex; flex-direction: column; gap: 6px;
+  background: rgba(0,0,0,0.18);
 }
-.side-foot-row { display: flex; justify-content: space-between; }
+.side-foot-row { display: flex; justify-content: space-between; align-items: center; }
+.side-foot-row .lbl { color: var(--paper-500); font-size: 10px; text-transform: uppercase; letter-spacing: 0.14em; }
 
-.app-main { grid-area: main; padding: 18px; overflow: auto; }
+/* ── main ───────────────────────────────────────────────────── */
+.app-main {
+  grid-area: main;
+  padding: 24px 28px 56px;
+  overflow: auto;
+  scroll-behavior: smooth;
+}
 .tab { display: none; }
-.tab.is-active { display: block; animation: tabIn .18s ease; }
-@keyframes tabIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+.tab.is-active { display: block; animation: tabIn 280ms var(--ease); }
+@keyframes tabIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
 
-#vizCanvas { display: block; width: 100%; height: auto; background: #000; border-radius: var(--radius); }
+/* visualizer canvas */
+#vizCanvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: #02040a;
+  border-radius: var(--r-md);
+}
 
-@media (max-width: 760px) {
+/* ── responsive ─────────────────────────────────────────────── */
+@media (max-width: 820px) {
   body { grid-template-columns: 1fr; grid-template-areas: "header" "main"; }
   .app-sidebar { display: none; }
-  .header-tabs { display: flex; gap: 4px; overflow-x: auto; }
+  .header-tabs { display: flex; gap: 4px; overflow-x: auto; padding: 0 8px; }
+  .app-main { padding: 18px; }
 }
+
+/* ── nice scrollbars ────────────────────────────────────────── */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--ink-400); border-radius: var(--r-pill); border: 2px solid var(--ink-900); }
+::-webkit-scrollbar-thumb:hover { background: var(--ink-300); }
+
+/* ── selection ──────────────────────────────────────────────── */
+::selection { background: rgba(58,139,255,0.35); color: #fff; }
