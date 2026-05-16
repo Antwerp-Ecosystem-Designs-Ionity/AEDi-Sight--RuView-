@@ -44,6 +44,7 @@ from .esp_watchdog import EspWatchdog
 from .vitals import Vitals
 from . import state, ota, chat_stream, libs, ruview
 from .debug_tools import SerialMonitor, nvs_dump_argv, parse_nvs_file
+from .services import ServiceSupervisor
 
 log = logging.getLogger("aedi.server")
 STARTED = time.time()
@@ -200,6 +201,23 @@ async def api_nvs_dump(request: web.Request) -> web.Response:
 
 async def api_nvs_parse(_request: web.Request) -> web.Response:
     return web.json_response(parse_nvs_file(SETTINGS.state_dir / "nvs.bin"))
+
+
+async def api_services_list(request: web.Request) -> web.Response:
+    sup: ServiceSupervisor = request.app["services"]
+    return web.json_response({"services": sup.list()})
+
+
+async def api_services_op(request: web.Request) -> web.Response:
+    sup: ServiceSupervisor = request.app["services"]
+    sid = request.match_info["sid"]
+    op  = request.match_info["op"]
+    if op == "start":   return web.json_response(await sup.start(sid))
+    if op == "stop":    return web.json_response(await sup.stop(sid))
+    if op == "restart": return web.json_response(await sup.restart(sid))
+    if op == "log":
+        return web.json_response({"id": sid, "lines": sup.recent_log(sid)})
+    return web.json_response({"error": "unknown op"}, status=404)
 
 
 async def api_sink_op(request: web.Request) -> web.Response:
@@ -364,6 +382,7 @@ def build_app() -> web.Application:
         sink.add_consumer(vitals_.on_csi)
     watchdog = EspWatchdog(bus, sink)
     serial_mon = SerialMonitor(bus)
+    services = ServiceSupervisor(bus)
 
     app = web.Application(client_max_size=4 << 20)
     app["bus"] = bus
@@ -374,6 +393,7 @@ def build_app() -> web.Application:
     app["vitals"] = vitals_
     app["esp_watchdog"] = watchdog
     app["serial_monitor"] = serial_mon
+    app["services"] = services
 
     app.add_routes([
         web.get("/",                       index),
@@ -399,6 +419,9 @@ def build_app() -> web.Application:
         web.post("/api/serial/{op}",       api_serial_monitor),
         web.post("/api/nvs/dump",          api_nvs_dump),
         web.get("/api/nvs/parse",          api_nvs_parse),
+        web.get("/api/services",           api_services_list),
+        web.post("/api/services/{sid}/{op}", api_services_op),
+        web.get("/api/services/{sid}/log", api_services_op),
         web.post("/api/chat",              api_chat),
         web.get("/api/logs/recent",        api_logs_recent),
         web.get("/api/git/status",         lambda r: api_git_status_passthrough(r)),
@@ -422,6 +445,8 @@ def build_app() -> web.Application:
             log.warning("watchdog start failed: %s", e)
 
     async def on_cleanup(app):
+        try: await services.stop_all()
+        except Exception: pass
         try: await watchdog.stop()
         except Exception: pass
         try: await sink.stop()

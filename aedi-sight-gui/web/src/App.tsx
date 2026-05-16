@@ -7,6 +7,7 @@ import { Intro } from "./components/Intro";
 import { Header } from "./components/Header";
 
 import { Home }        from "./tabs/Home";
+import { Services }    from "./tabs/Services";
 import { Provision }   from "./tabs/Provision";
 import { Sink }        from "./tabs/Sink";
 import { Visualizer }  from "./tabs/Visualizer";
@@ -21,12 +22,13 @@ import { Debug }       from "./tabs/Debug";
 import { About }       from "./tabs/About";
 
 export type TabId =
-  | "home" | "provision" | "sink" | "visualizer" | "ml" | "debug" | "chat"
+  | "home" | "services" | "provision" | "sink" | "visualizer" | "ml" | "debug" | "chat"
   | "libs" | "ruview" | "tools" | "logs" | "updates" | "about";
 
 interface TabDef { id: TabId; label: string; icon: IconName; group: "operate" | "explore" | "manage"; element: JSX.Element }
 const tabs: TabDef[] = [
   { id: "home",       label: "Overview",    icon: "home",      group: "operate", element: <Home /> },
+  { id: "services",   label: "Services",    icon: "cpu",       group: "operate", element: <Services /> },
   { id: "provision",  label: "Provision",   icon: "provision", group: "operate", element: <Provision /> },
   { id: "sink",       label: "Sink",        icon: "sink",      group: "operate", element: <Sink /> },
   { id: "visualizer", label: "Visualizer",  icon: "viz",       group: "operate", element: <Visualizer /> },

@@ -27,15 +27,14 @@ export function useWebSocket(): {
         let msg: BusMessage<unknown>;
         try { msg = JSON.parse(ev.data) as BusMessage<unknown>; } catch { return; }
         if (!msg.topic) return;
-        // `msg.topic` arrives from a remote websocket — treat as untrusted.
-        // Strip C0 control chars + DEL (CodeQL js/log-injection) and bound
-        // the length before passing to console.error.
-        const safeTopic = String(msg.topic).replace(/[\x00-\x1f\x7f]/g, " ").slice(0, 64);
         // Each subscriber gets isolated error handling — a throw in one
-        // handler must not stop the rest of the message fan-out.
+        // handler must not stop the rest of the message fan-out. Note: we
+        // intentionally do NOT include the WebSocket-supplied topic string
+        // in the log message (CodeQL js/log-injection). The Error object
+        // itself is the only thing surfaced.
         const dispatch = (fn: (m: BusMessage<unknown>) => void) => {
           try { fn(msg); }
-          catch (e) { console.error("[wsbus] handler error on topic", safeTopic, e); }
+          catch (e) { console.error("[wsbus] handler error", e); }
         };
         handlers.current.get(msg.topic)?.forEach(dispatch);
         handlers.current.get("*")?.forEach(dispatch);
