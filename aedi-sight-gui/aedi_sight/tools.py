@@ -187,9 +187,40 @@ def public_groups() -> list[dict]:
     ]
 
 
-def spec_for(item_id: str) -> Optional[JobSpec]:
+def spec_for(item_id: str, extra_args: Optional[list[str]] = None) -> Optional[JobSpec]:
     it = _flat().get(item_id)
     if not it:
         return None
-    return JobSpec(cmd=[it["cmd"]], cwd=str(SETTINGS.repo_root), topic="log",
+    cmd = list(it["cmd"])
+    if extra_args:
+        cmd.extend(extra_args)
+    return JobSpec(cmd=[cmd], cwd=str(SETTINGS.repo_root), topic="log",
                    label=it["label"])
+
+
+def help_for(item_id: str) -> Optional[str]:
+    """Read the script source and pull a likely usage/help block (first 60 lines
+    + any argparse `add_argument` calls). Lets the UI render a hint before the
+    user fills the args modal."""
+    it = _flat().get(item_id)
+    if not it: return None
+    if not it["cmd"]:
+        return None
+    # Find the .py / .sh / .js path in the argv
+    src = None
+    for a in it["cmd"]:
+        p = Path(a)
+        if p.exists() and p.is_file():
+            src = p; break
+    if not src:
+        return None
+    try:
+        txt = src.read_text(errors="replace")
+    except Exception:
+        return None
+    # Heuristic: take everything between the first """...""" or # comment block.
+    head = "\n".join(txt.splitlines()[:80])
+    # Also grep add_argument calls for an args list.
+    import re
+    args = re.findall(r"add_argument\(([^)]*)\)", txt)
+    return head + ("\n\n--- args detected ---\n" + "\n".join(args[:20]) if args else "")

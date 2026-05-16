@@ -341,6 +341,82 @@
       <div class="cards" id="toolCards"></div>
     </section>
 
+    <section data-tab="libs" class="tab">
+      <header class="tab-head">
+        <h2>Libraries · SDK</h2>
+        <p class="sub">Every shippable unit in the repo — Rust crates, firmware, Python packages, vendor submodules, sub-apps. Click a card to focus.</p>
+      </header>
+      <div class="row gap" style="margin-bottom:14px;">
+        <button class="btn xs" data-libgroup="all">all</button>
+        <button class="btn xs" data-libgroup="rust">Rust crates</button>
+        <button class="btn xs" data-libgroup="firmware">Firmware</button>
+        <button class="btn xs" data-libgroup="python">Python</button>
+        <button class="btn xs" data-libgroup="vendor">Vendor</button>
+        <button class="btn xs" data-libgroup="apps">Apps</button>
+        <input id="libSearch" placeholder="filter…" style="max-width:260px;margin-left:auto;" />
+      </div>
+      <div class="cards" id="libCards"></div>
+      <div id="libDetail" class="card accent" style="margin-top:14px; display:none;"></div>
+    </section>
+
+    <section data-tab="ruview" class="tab">
+      <header class="tab-head">
+        <h2>RuView · plugin</h2>
+        <p class="sub">9 skills · 7 <code>/ruview-*</code> commands · 3 agents — surfaced from <code>plugins/ruview/</code>. Click any card to read the spec.</p>
+      </header>
+      <div class="cards row">
+        <div class="card flex2">
+          <h3>Commands · <code>/ruview-*</code></h3>
+          <div id="ruviewCmds" class="cards" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;"></div>
+        </div>
+        <div class="card">
+          <h3>Skills</h3>
+          <div id="ruviewSkills"></div>
+        </div>
+        <div class="card">
+          <h3>Agents</h3>
+          <div id="ruviewAgents"></div>
+        </div>
+      </div>
+      <div id="ruviewDoc" class="card accent" style="margin-top:14px; display:none;"></div>
+    </section>
+
+    <section data-tab="debug" class="tab">
+      <header class="tab-head">
+        <h2>Debug</h2>
+        <p class="sub">ESP32 serial monitor (live), NVS dump &amp; parse, packet error counters. Use when a node misbehaves.</p>
+      </header>
+      <div class="cards">
+        <div class="card">
+          <h3>Serial monitor</h3>
+          <div class="row gap" style="margin-bottom:10px;">
+            <select id="dbgPort" style="max-width:260px;"></select>
+            <button class="btn xs" id="dbgRescan">rescan</button>
+            <button class="btn xs primary" id="dbgSerStart">start</button>
+            <button class="btn xs" id="dbgSerStop">stop</button>
+          </div>
+          <pre id="dbgSerLog" class="log term"></pre>
+        </div>
+        <div class="card">
+          <h3>NVS partition · 0x9000 · 24 KiB</h3>
+          <p class="dim" style="font-size:12px">Reads the partition over esptool, then parses the known
+            <code>csi_cfg</code> keys (ssid · password · target_ip · target_port · node_id · tdm_slot · tdm_nodes · csi_channel · edge_tier · filter_mac).</p>
+          <div class="row gap">
+            <button class="btn xs primary" id="dbgNvsDump">dump &amp; parse</button>
+            <button class="btn xs" id="dbgNvsRefresh">re-parse cached</button>
+          </div>
+          <pre id="dbgNvsOut" class="log"></pre>
+        </div>
+        <div class="card">
+          <h3>Sink counters</h3>
+          <div class="kv"><span>Total frames</span><span id="dbgTotal">—</span></div>
+          <div class="kv"><span>Decode errors</span><span id="dbgErr">0</span></div>
+          <div class="kv"><span>WS clients</span><span id="dbgWs">—</span></div>
+          <div class="kv"><span>Sink bound</span><span id="dbgBind">—</span></div>
+        </div>
+      </div>
+    </section>
+
     <section data-tab="updates" class="tab">
       <header class="tab-head"><h2>Updates</h2><p class="sub">Git status · pull · changelog · self-update.</p></header>
       <div class="cards">

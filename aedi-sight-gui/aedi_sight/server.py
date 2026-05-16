@@ -34,7 +34,7 @@ from . import __version__
 from .config  import SETTINGS, host_ip, host_ssid, host_channel
 from .wsbus   import WsBus, ws_handler
 from .sink    import UdpSink
-from .jobs    import JobRunner
+from .jobs    import JobRunner, JobSpec
 from .provision import build_spec as build_prov_spec, list_serial_ports
 from .chat    import handle as chat_handle
 from . import gitops, ml, tools
@@ -42,7 +42,8 @@ from .logbridge import BusHandler
 from .local_ml import LocalML
 from .esp_watchdog import EspWatchdog
 from .vitals import Vitals
-from . import state, ota, chat_stream
+from . import state, ota, chat_stream, libs, ruview
+from .debug_tools import SerialMonitor, nvs_dump_argv, parse_nvs_file
 
 log = logging.getLogger("aedi.server")
 STARTED = time.time()
@@ -131,6 +132,59 @@ async def api_chat_stream(request: web.Request) -> web.Response:
     # Fire and forget — output streams via the 'chat' WS topic.
     asyncio.create_task(chat_stream.stream_chat(request.app["bus"], prompt))
     return web.json_response({"streaming": True, "prompt": prompt})
+
+
+async def api_libs(_request: web.Request) -> web.Response:
+    """SDK / library manifest — every shippable unit in the repo."""
+    return web.json_response(libs.manifest())
+
+
+async def api_ruview(_request: web.Request) -> web.Response:
+    """RuView plugin inventory — commands, skills, agents."""
+    return web.json_response(ruview.snapshot())
+
+
+async def api_ruview_file(request: web.Request) -> web.Response:
+    """Markdown body for a single RuView entry — path passed as ?path=plugins/ruview/..."""
+    p = request.query.get("path", "")
+    txt = ruview.file_content(p)
+    if txt is None:
+        return web.json_response({"error": "not found or outside plugins/ruview/"}, status=404)
+    return web.json_response({"path": p, "markdown": txt})
+
+
+async def api_serial_monitor(request: web.Request) -> web.Response:
+    """Start / stop the ESP32 serial monitor. Lines stream on WS topic 'serial'."""
+    op = request.match_info["op"]
+    mon: SerialMonitor = request.app["serial_monitor"]
+    if op == "start":
+        body = await request.json()
+        port = (body or {}).get("port") or "/dev/ttyACM0"
+        baud = int((body or {}).get("baud", 115200))
+        r = await mon.start(port, baud)
+        return web.json_response(r)
+    if op == "stop":
+        return web.json_response(await mon.stop())
+    if op == "status":
+        return web.json_response({"running": mon.running, "port": mon.port})
+    return web.json_response({"error": "unknown op"}, status=404)
+
+
+async def api_nvs_dump(request: web.Request) -> web.Response:
+    """Read the 24 KiB NVS partition over esptool, parse known keys."""
+    body = await request.json()
+    port = (body or {}).get("port") or "/dev/ttyACM0"
+    out_path = SETTINGS.state_dir / "nvs.bin"
+    spec = JobSpec(cmd=[nvs_dump_argv(port)], cwd=str(SETTINGS.repo_root),
+                   topic="serial", label=f"read NVS from {port}")
+    request.app["jobs"].submit(spec)
+    # Wait briefly for the read to complete, then parse if the file appeared.
+    await asyncio.sleep(0.05)
+    return web.json_response({"submitted": True, "expected_path": str(out_path)})
+
+
+async def api_nvs_parse(_request: web.Request) -> web.Response:
+    return web.json_response(parse_nvs_file(SETTINGS.state_dir / "nvs.bin"))
 
 
 async def api_sink_op(request: web.Request) -> web.Response:
@@ -245,11 +299,24 @@ async def api_tools_list(_request: web.Request) -> web.Response:
 
 async def api_tools_run(request: web.Request) -> web.Response:
     body = await request.json()
-    spec = tools.spec_for(body.get("id", ""))
+    raw_args = (body or {}).get("args") or ""
+    # Split on whitespace; never invoke a shell.
+    import shlex
+    try: argv_extra = shlex.split(raw_args) if isinstance(raw_args, str) else list(raw_args)
+    except ValueError: argv_extra = []
+    spec = tools.spec_for(body.get("id", ""), argv_extra)
     if not spec:
         return web.json_response({"error": "unknown tool id"}, status=404)
     jid = request.app["jobs"].submit(spec)
     return web.json_response({"job_id": jid})
+
+
+async def api_tools_help(request: web.Request) -> web.Response:
+    iid = request.query.get("id", "")
+    h = tools.help_for(iid)
+    if h is None:
+        return web.json_response({"error": "no help / not found"}, status=404)
+    return web.json_response({"id": iid, "help": h[:6000]})
 
 
 # ─── app wiring ─────────────────────────────────────────────────────────────
@@ -281,6 +348,7 @@ def build_app() -> web.Application:
     if vitals_.enabled:
         sink.add_consumer(vitals_.on_csi)
     watchdog = EspWatchdog(bus, sink)
+    serial_mon = SerialMonitor(bus)
 
     app = web.Application(client_max_size=4 << 20)
     app["bus"] = bus
@@ -290,6 +358,7 @@ def build_app() -> web.Application:
     app["local_ml"] = local_ml
     app["vitals"] = vitals_
     app["esp_watchdog"] = watchdog
+    app["serial_monitor"] = serial_mon
 
     app.add_routes([
         web.get("/",                       index),
@@ -309,6 +378,12 @@ def build_app() -> web.Application:
         web.post("/api/fleet/forget/{nid}", api_fleet_forget),
         web.post("/api/ota/reflash",       api_ota_reflash),
         web.post("/api/chat/stream",       api_chat_stream),
+        web.get("/api/libs",               api_libs),
+        web.get("/api/ruview",             api_ruview),
+        web.get("/api/ruview/file",        api_ruview_file),
+        web.post("/api/serial/{op}",       api_serial_monitor),
+        web.post("/api/nvs/dump",          api_nvs_dump),
+        web.get("/api/nvs/parse",          api_nvs_parse),
         web.post("/api/chat",              api_chat),
         web.get("/api/logs/recent",        api_logs_recent),
         web.get("/api/git/status",         lambda r: api_git_status_passthrough(r)),
@@ -316,6 +391,7 @@ def build_app() -> web.Application:
         web.get("/api/changelog",          api_changelog),
         web.get("/api/tools",              api_tools_list),
         web.post("/api/tools/run",         api_tools_run),
+        web.get("/api/tools/help",         api_tools_help),
         web.get("/ws",                     ws_handler),
         web.static("/static",              str(SETTINGS.static_dir), show_index=False),
     ])

@@ -9,18 +9,24 @@ import { initChat }        from './tabs/chat.js';
 import { initLogs }        from './tabs/logs.js';
 import { initTools }       from './tabs/tools.js';
 import { initUpdates }     from './tabs/updates.js';
+import { initLibs }        from './tabs/libs.js';
+import { initRuView }      from './tabs/ruview.js';
+import { initDebug }       from './tabs/debug.js';
 import { wsBus }           from './wsbus.js';
 import { ICON }            from './icons.js';
 
-// Two sections in the sidebar: "OPERATE" (live work) + "MANAGE" (admin).
+// Three sections: OPERATE (live), EXPLORE (catalog), MANAGE (admin).
 const TABS = [
   { id: 'home',       label: 'Overview',     icon: 'home',      group: 'operate' },
   { id: 'provision',  label: 'Provision',    icon: 'provision', group: 'operate' },
   { id: 'sink',       label: 'Sink',         icon: 'sink',      group: 'operate' },
   { id: 'visualizer', label: 'Visualizer',   icon: 'viz',       group: 'operate' },
   { id: 'ml',         label: 'ML · Vitals',  icon: 'ml',        group: 'operate' },
+  { id: 'debug',      label: 'Debug',        icon: 'cpu',       group: 'operate' },
   { id: 'chat',       label: 'Chat',         icon: 'chat',      group: 'operate' },
-  { id: 'tools',      label: 'Tools',        icon: 'tools',     group: 'manage' },
+  { id: 'libs',       label: 'Libraries',    icon: 'shield',    group: 'explore' },
+  { id: 'ruview',     label: 'RuView',       icon: 'radio',     group: 'explore' },
+  { id: 'tools',      label: 'Tools',        icon: 'tools',     group: 'explore' },
   { id: 'logs',       label: 'Logs',         icon: 'logs',      group: 'manage' },
   { id: 'updates',    label: 'Updates',      icon: 'updates',   group: 'manage' },
   { id: 'about',      label: 'About',        icon: 'about',     group: 'manage' },
@@ -125,6 +131,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   initLogs();
   initTools();
   initUpdates();
+  initLibs();
+  initRuView();
+  initDebug();
 
   const startTab = (location.hash || '#home').slice(1);
   activateTab(TABS.find(t => t.id === startTab) ? startTab : 'home');
