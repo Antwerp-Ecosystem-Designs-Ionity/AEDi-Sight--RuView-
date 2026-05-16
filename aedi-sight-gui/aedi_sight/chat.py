@@ -6,7 +6,7 @@ Resolution order for a user message:
      and ANTHROPIC_API_KEY is set; else echo with a hint.
 """
 from __future__ import annotations
-import os, re, shutil, subprocess
+import os, shutil, subprocess
 from .config import SETTINGS, host_ip, host_ssid, host_channel
 
 
@@ -31,62 +31,57 @@ def _claude_flow_available() -> bool:
     return bool(_which("claude-flow") or _which("npx"))
 
 
-_MAX_PROMPT_LEN = 4000     # claude-flow gets a hard cap to keep argv bounded
-
-# Positive ASCII allowlist for chat prompts handed off to a subprocess.
-# CodeQL recognises `re.fullmatch` against a literal character class as a
-# sanitiser for `py/command-line-injection`, so this closes the static-analysis
-# finding. The trade-off: non-ASCII characters (emoji, accented letters,
-# CJK) are rejected — fine for the first cut; we can broaden once we move
-# the prompt out of argv entirely (e.g. via stdin).
-_PROMPT_ALLOWLIST = re.compile(
-    r"[A-Za-z0-9 \t.,!?:;'\"()\[\]{}/\\\-_=+*&%#@~^|<>$`]+"
-)
+_MAX_PROMPT_LEN = 4000     # hard cap on the message handed to claude-flow
 
 
 def _sanitize_prompt(text: str) -> str | None:
-    """Return a sanitised prompt or None when the input is unusable.
-
-    Two-layer check:
-      1. Type + length bound + strip — bare-minimum hygiene.
-      2. `re.fullmatch` against an explicit ASCII printable allowlist —
-         recognised by CodeQL as a sanitiser for the argv sink below.
-    """
+    """Bare-minimum hygiene on the prompt. The full command-injection guard
+    is at the call site: we never pass `text` as an argv element — it flows
+    through subprocess stdin instead. So this only has to bound size and
+    reject patently-bad inputs."""
     if not isinstance(text, str): return None
     s = text.strip()
     if not s: return None
     if len(s) > _MAX_PROMPT_LEN: return None
-    if not _PROMPT_ALLOWLIST.fullmatch(s):
-        return None
+    # Reject embedded NULs — Python `subprocess.communicate(input=...)` will
+    # happily forward them and they're never desired in a chat prompt.
+    if "\x00" in s: return None
     return s
 
 
 def _try_claude_flow(text: str, timeout: float = 25.0) -> str | None:
-    """Best-effort: call claude-flow chat via npx. If the env is missing or
-    the call fails, return None and the caller falls back to local echo.
+    """Best-effort: call claude-flow chat. If env is missing or the call
+    fails, return None so the caller falls back to local echo.
 
-    `text` is fully sanitised via a positive allowlist before being passed
-    as a single argv element (shell=False is explicit). The allowlist
-    pattern is what CodeQL's `py/command-line-injection` recognises as a
-    sanitiser — so the value flowing into `cmd` is no longer tainted.
+    Security: the prompt is **never** placed on the command line. The argv
+    is a constant list of literal flag names; the user-supplied prompt is
+    forwarded via the subprocess's stdin pipe. CodeQL's
+    `py/command-line-injection` rule applies to data that enters argv —
+    stdin is out of its scope, so this design eliminates the sink entirely.
     """
     if not os.environ.get("ANTHROPIC_API_KEY"):
         return None
     safe = _sanitize_prompt(text)
     if safe is None:
-        return "(chat: refused — prompt empty, too long, or contains non-ASCII / control characters)"
-    # `safe` is guaranteed by _sanitize_prompt to fullmatch _PROMPT_ALLOWLIST,
-    # which CodeQL treats as a command-line-injection sanitiser.
+        return "(chat: refused — prompt empty, too long, or contains a NUL byte)"
+    # argv is constant; nothing the user types reaches it.
     cmd = None
     if _which("claude-flow"):
-        cmd = ["claude-flow", "chat", "--message", safe, "--quiet"]
+        cmd = ["claude-flow", "chat", "--stdin", "--quiet"]
     elif _which("npx"):
-        cmd = ["npx", "-y", "@claude-flow/cli@latest", "chat", "--message", safe, "--quiet"]
+        cmd = ["npx", "-y", "@claude-flow/cli@latest", "chat", "--stdin", "--quiet"]
     if not cmd:
         return None
     try:
-        # shell=False — text passes as a single argv element, never to a shell.
-        out = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, shell=False)
+        # input= forwards the bytes to stdin; the command line stays static.
+        out = subprocess.run(
+            cmd,
+            input=safe,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            shell=False,
+        )
         if out.returncode == 0 and out.stdout.strip():
             return out.stdout.strip()
         return (out.stderr or out.stdout or "").strip() or None
