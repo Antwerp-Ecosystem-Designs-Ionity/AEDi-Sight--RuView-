@@ -22,7 +22,19 @@ LOGO = [
 "  ▀█████  ██████   ██   ██  ██    ██       █",
 ]
 
+# ASCII-only fallback for terminals whose stdout encoding can't handle the
+# Unicode block-glyphs above (Windows cp1252 default, redirected files on
+# old locales, etc.). Same row count, same vibe.
+LOGO_ASCII = [
+"  ##### ##### #  # # ##### ##  ##",
+"  #   # #   # ## # #   #    ####",
+"  #   # #   # # ## #   #     ##",
+"  #   # #   # #  # #   #     ##",
+"  ##### ##### #  # #   #     ##",
+]
+
 TAGLINE = "WiFi-CSI sensing console · Antwerp Designs · 2018 – 2026"
+TAGLINE_ASCII = "WiFi-CSI sensing console - Antwerp Designs - 2018-2026"
 
 
 def _truecolor_supported() -> bool:
@@ -49,12 +61,35 @@ def _hide_cursor() -> None: sys.stdout.write("\x1b[?25l"); sys.stdout.flush()
 def _show_cursor() -> None: sys.stdout.write("\x1b[?25h"); sys.stdout.flush()
 
 
+def _stdout_can_encode(s: str) -> bool:
+    """Stdout is happy to print this string? Windows cp1252 chokes on the
+    block-glyph logo; redirected streams in old locales can too."""
+    enc = (getattr(sys.stdout, "encoding", None) or "ascii").lower()
+    try:
+        s.encode(enc)
+        return True
+    except (UnicodeEncodeError, LookupError):
+        return False
+
+
 def banner(fast: bool = False) -> None:
     """Print the IONITY banner. fast=True skips the sweep animation."""
+    # Try to bump stdout to UTF-8 on Windows where Python defaults to cp1252.
+    # `reconfigure` is available on Python 3.7+ for the standard `sys.stdout`.
+    if not _stdout_can_encode("▄█▀"):
+        try: sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[attr-defined]
+        except Exception: pass
+
     if not _truecolor_supported():
-        # Mono fallback.
-        for ln in LOGO: print(ln)
-        print(); print(TAGLINE); print(); return
+        # Mono fallback — drop to ASCII-only when stdout still can't handle
+        # the block glyphs after the reconfigure attempt.
+        if _stdout_can_encode("▄█▀"):
+            for ln in LOGO: print(ln)
+            print(); print(TAGLINE); print()
+        else:
+            for ln in LOGO_ASCII: print(ln)
+            print(); print(TAGLINE_ASCII); print()
+        return
 
     width = shutil.get_terminal_size((80, 24)).columns
     pad   = " " * max(0, (width - max(len(l) for l in LOGO)) // 2)

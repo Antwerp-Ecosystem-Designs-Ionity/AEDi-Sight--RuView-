@@ -31,20 +31,48 @@ def _claude_flow_available() -> bool:
     return bool(_which("claude-flow") or _which("npx"))
 
 
+_MAX_PROMPT_LEN = 4000     # claude-flow gets a hard cap to keep argv bounded
+_BAD_CHARS = ("\x00", "\r", "\n", "\x1b")  # NULs + newlines + ESC reject
+
+
+def _sanitize_prompt(text: str) -> str | None:
+    """Reject prompts that don't look like plain text. We pass `text` as an
+    argv element (never to a shell), so the threat is bounded — but bounding
+    it makes the CodeQL `py/command-line-injection` finding moot.
+
+    Returns the sanitised string or None when the input is unusable."""
+    if not isinstance(text, str): return None
+    if any(c in text for c in _BAD_CHARS): return None
+    s = text.strip()
+    if not s: return None
+    if len(s) > _MAX_PROMPT_LEN: return None
+    return s
+
+
 def _try_claude_flow(text: str, timeout: float = 25.0) -> str | None:
     """Best-effort: call claude-flow chat via npx. If the env is missing or
-    the call fails, return None and the caller falls back to local echo."""
+    the call fails, return None and the caller falls back to local echo.
+
+    `text` is sanitised + passed as an argv element (no shell interpretation),
+    so command injection is not reachable here; the sanitiser also bounds
+    length and rejects control characters.
+    """
     if not os.environ.get("ANTHROPIC_API_KEY"):
         return None
+    safe = _sanitize_prompt(text)
+    if safe is None:
+        return "(chat: refused — prompt empty, too long, or contains control chars)"
     cmd = None
     if _which("claude-flow"):
-        cmd = ["claude-flow", "chat", "--message", text, "--quiet"]
+        cmd = ["claude-flow", "chat", "--message", safe, "--quiet"]
     elif _which("npx"):
-        cmd = ["npx", "-y", "@claude-flow/cli@latest", "chat", "--message", text, "--quiet"]
+        cmd = ["npx", "-y", "@claude-flow/cli@latest", "chat", "--message", safe, "--quiet"]
     if not cmd:
         return None
     try:
-        out = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+        # shell=False (default) — text passes as a single argv element,
+        # never interpreted by a shell.
+        out = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, shell=False)
         if out.returncode == 0 and out.stdout.strip():
             return out.stdout.strip()
         return (out.stderr or out.stdout or "").strip() or None

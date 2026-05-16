@@ -24,12 +24,17 @@ export function useWebSocket(): {
         setConnected(true);
       };
       ws.onmessage = ev => {
-        try {
-          const msg = JSON.parse(ev.data) as BusMessage<unknown>;
-          if (!msg.topic) return;
-          handlers.current.get(msg.topic)?.forEach(fn => fn(msg));
-          handlers.current.get("*")?.forEach(fn => fn(msg));
-        } catch {}
+        let msg: BusMessage<unknown>;
+        try { msg = JSON.parse(ev.data) as BusMessage<unknown>; } catch { return; }
+        if (!msg.topic) return;
+        // Each subscriber gets isolated error handling — a throw in one
+        // handler must not stop the rest of the message fan-out.
+        const dispatch = (fn: (m: BusMessage<unknown>) => void) => {
+          try { fn(msg); }
+          catch (e) { console.error("[wsbus] handler error on topic", msg.topic, e); }
+        };
+        handlers.current.get(msg.topic)?.forEach(dispatch);
+        handlers.current.get("*")?.forEach(dispatch);
       };
       ws.onclose = () => {
         setConnected(false);

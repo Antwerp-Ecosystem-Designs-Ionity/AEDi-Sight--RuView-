@@ -25,6 +25,8 @@ from collections import deque
 from dataclasses import dataclass, field
 from typing import Dict, Optional
 
+import numpy as np
+
 from .wsbus import WsBus
 
 log = logging.getLogger("aedi.local_ml")
@@ -34,8 +36,11 @@ log = logging.getLogger("aedi.local_ml")
 class NodeML:
     n_sc: int = 0
     n_samples: int = 0
-    mu: list = field(default_factory=list)        # running mean per subcarrier
-    m2: list = field(default_factory=list)        # running sum-of-squares
+    # Welford running mean / sum-of-squares stored as numpy float64 arrays so
+    # we can vectorise the per-frame update over all subcarriers in one shot
+    # instead of looping in Python.
+    mu: np.ndarray = field(default_factory=lambda: np.empty(0, dtype=np.float64))
+    m2: np.ndarray = field(default_factory=lambda: np.empty(0, dtype=np.float64))
     last_score: float = 0.0
     score_hist: deque = field(default_factory=lambda: deque(maxlen=64))
     last_publish: float = 0.0
@@ -88,12 +93,13 @@ class LocalML:
         st.rssi = frame.get("rssi")
         if st.n_sc == 0:
             st.n_sc = len(amp)
-            st.mu = [0.0] * st.n_sc
-            st.m2 = [0.0] * st.n_sc
+            st.mu = np.zeros(st.n_sc, dtype=np.float64)
+            st.m2 = np.zeros(st.n_sc, dtype=np.float64)
         if len(amp) != st.n_sc:
             return  # subcarrier count changed; skip until reset
-        self._welford_update(st, amp)
-        st.last_score = self._mahalanobis(st, amp)
+        x = np.asarray(amp, dtype=np.float64)
+        self._welford_update(st, x)
+        st.last_score = self._mahalanobis(st, x)
         st.score_hist.append(st.last_score)
 
         self._maybe_transition(nid, st)
@@ -104,26 +110,31 @@ class LocalML:
 
     # ── internals ────────────────────────────────────────────────────────
 
-    def _welford_update(self, st: NodeML, amp: list) -> None:
+    def _welford_update(self, st: NodeML, x: np.ndarray) -> None:
+        """Vectorised Welford — one element-wise update over all subcarriers.
+
+        Equivalent to the canonical scalar form
+            d = x - mu;  mu += d/n;  m2 += d * (x - mu)
+        applied to every subcarrier in parallel.
+        """
         st.n_samples += 1
         n = st.n_samples
-        for k in range(st.n_sc):
-            x = float(amp[k])
-            d = x - st.mu[k]
-            st.mu[k] += d / n
-            st.m2[k] += d * (x - st.mu[k])
+        d  = x - st.mu
+        st.mu += d / n
+        st.m2 += d * (x - st.mu)
 
-    def _mahalanobis(self, st: NodeML, amp: list) -> float:
+    def _mahalanobis(self, st: NodeML, x: np.ndarray) -> float:
+        """Vectorised Mahalanobis-distance over subcarriers — single numpy
+        expression replaces the Python loop and returns a Python float."""
         if st.n_samples <= self.calib_frames:
             return 0.0
-        s = 0.0
         n = max(1, st.n_samples - 1)
-        for k in range(st.n_sc):
-            var = st.m2[k] / n
-            if var < 1e-6:
-                continue
-            d = float(amp[k]) - st.mu[k]
-            s += (d * d) / var
+        var = st.m2 / n
+        mask = var >= 1e-6
+        if not mask.any():
+            return 0.0
+        diff = x - st.mu
+        s = float(np.sum((diff[mask] ** 2) / var[mask]))
         # Normalize by subcarrier count → "average sigmas of deviation".
         return math.sqrt(s / max(1, st.n_sc))
 

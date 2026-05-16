@@ -109,7 +109,12 @@ async def api_fleet_state(_request: web.Request) -> web.Response:
 
 
 async def api_fleet_forget(request: web.Request) -> web.Response:
-    nid = int(request.match_info["nid"])
+    try:
+        nid = int(request.match_info["nid"])
+    except (TypeError, ValueError):
+        return web.json_response({"error": "nid must be an integer"}, status=400)
+    if not 0 <= nid <= 255:
+        return web.json_response({"error": "nid out of range (0..255)"}, status=400)
     state.forget(nid)
     return web.json_response({"forgot": nid})
 
@@ -165,7 +170,12 @@ async def api_serial_monitor(request: web.Request) -> web.Response:
     if op == "start":
         body = await request.json()
         port = (body or {}).get("port") or "/dev/ttyACM0"
-        baud = int((body or {}).get("baud", 115200))
+        try:
+            baud = int((body or {}).get("baud", 115200))
+        except (TypeError, ValueError):
+            return web.json_response({"error": "baud must be an integer"}, status=400)
+        if not 50 <= baud <= 4_000_000:
+            return web.json_response({"error": "baud out of range (50..4_000_000)"}, status=400)
         r = await mon.start(port, baud)
         return web.json_response(r)
     if op == "stop":

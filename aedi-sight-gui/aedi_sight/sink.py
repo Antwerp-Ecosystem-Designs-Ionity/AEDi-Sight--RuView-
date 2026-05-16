@@ -17,6 +17,8 @@ import asyncio, math, struct, time, logging
 from dataclasses import dataclass, field
 from typing import Dict, Optional
 
+import numpy as np
+
 from .wsbus import WsBus
 
 log = logging.getLogger("aedi.sink")
@@ -141,13 +143,14 @@ class UdpSink:
         need = HEADER_SIZE + iq_count * 2
         if len(data) < need:
             return
-        iq = struct.unpack_from(f"<{iq_count*2}b", data, HEADER_SIZE)
-        amps = [0.0] * iq_count
-        phases = [0.0] * iq_count
-        for k in range(iq_count):
-            i = iq[2*k]; q = iq[2*k + 1]
-            amps[k]   = math.sqrt(i*i + q*q)
-            phases[k] = math.atan2(q, i)
+        # Vectorised I/Q decode — one numpy expression replaces the Python
+        # loop. np.frombuffer reinterprets the bytes as signed int8, the .copy
+        # detaches from the (read-only) datagram buffer, then the complex view
+        # gives us I+jQ in one shot for np.abs / np.angle.
+        iq_bytes = np.frombuffer(data, dtype=np.int8, count=iq_count * 2, offset=HEADER_SIZE)
+        iq_pairs = iq_bytes.astype(np.float32).reshape(-1, 2)
+        amps   = np.hypot(iq_pairs[:, 0], iq_pairs[:, 1]).tolist()
+        phases = np.arctan2(iq_pairs[:, 1], iq_pairs[:, 0]).tolist()
 
         frame = {
             "node_id": nid,
