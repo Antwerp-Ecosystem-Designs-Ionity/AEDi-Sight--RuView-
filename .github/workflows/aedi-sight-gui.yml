@@ -81,7 +81,9 @@ jobs:
               async with websockets.connect('ws://127.0.0.1:8088/ws') as ws:
                   await asyncio.wait_for(ws.recv(), 2.0)  # hello
                   s=socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-                  iq=bytes(((i*7) & 0xff) - 128 % 256 for i in range(16))
+                  # ADR-018 payload is signed int8 I/Q packed as raw bytes;
+                  # any 0..255 byte pattern is a valid signed-int8 reinterpretation.
+                  iq=bytes((i*7) & 0xff for i in range(16))
                   s.sendto(struct.pack(HDR, MAGIC, 5, 1, 8, 2462, 1, 0xb7, 0x9d)+iq, ('127.0.0.1',5005))
                   s.close()
                   for _ in range(20):
