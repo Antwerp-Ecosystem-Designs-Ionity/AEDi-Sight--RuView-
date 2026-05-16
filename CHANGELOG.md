@@ -8,6 +8,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`aedi-sight-gui` v0.3 — scipy vitals, OTA reflash, persisted per-node settings, streaming chat, ML overlay on visualizer.**
+  Third-pass additions:
+  - **scipy vitals** (`aedi_sight/vitals.py`) — `scipy.signal.welch` on a rolling
+    per-node mean-amplitude buffer. Picks the dominant peak in the breathing
+    band (0.10–0.50 Hz / 6–30 BPM) and heart-rate band (0.80–3.00 Hz /
+    48–180 BPM). Resilient to variable frame rate: re-samples to the median
+    Δt, detrends, then Welch. Publishes on WS topic `vitals` once per second
+    with `breathing_bpm`, `heart_rate_bpm`, and per-band confidence. Verified
+    on a 30 Hz synthetic carrier — fs=29.83, picked heart_rate_bpm=55.9
+    against the injected 1.20 Hz tone.
+  - **OTA reflash flow** (`aedi_sight/ota.py`) — `POST /api/ota/reflash`
+    takes `{ip, variant?}`, reads the prebuilt firmware from
+    `firmware/esp32-csi-node/release_bins/`, and POSTs it as
+    `application/octet-stream` to `http://<ip>:8032/ota`. Progress streams
+    on the `log` topic. Per-node *reflash* buttons in the Sink tab gate the
+    call behind a JS `confirm()`. Error path returns HTTP 502 cleanly.
+  - **Per-node settings persistence** (`aedi_sight/state.py`) — every
+    successful provision call snapshots its non-secret args into
+    `var/fleet-state.json` (passwords explicitly stripped). The Provision
+    tab's "Plan fleet" / node-id change pre-fills the form from the saved
+    args. New endpoints `GET /api/fleet/state`, `POST /api/fleet/forget/{nid}`.
+  - **ML state + vitals overlay on Visualizer canvas** — top-left badge
+    box redraws every 500 ms showing per-node state (idle/moving/spike) +
+    σ score + BR/HR. Colour-coded (green idle, amber moving, red spike).
+  - **Streaming chat backend** (`aedi_sight/chat_stream.py`) —
+    `POST /api/chat/stream` spawns `claude-flow chat --stream` (or
+    `npx @claude-flow/cli@latest …`) as an async subprocess and streams
+    every stdout line back on the `chat` WS topic. Slash-commands still hit
+    the synchronous `/api/chat` for cheap local replies. Falls back to a
+    visible "claude-flow not installed" message when the CLI is absent.
+  - **Sink bug fix** carried over from v0.2.1 — consumers fire on every
+    frame; only the WS broadcast is rate-limited.
 - **`aedi-sight-gui` v0.2 — real local ML, ESP32 self-healing, CI, auto-update, bootstrap installer, branded assets.**
   Second-pass enhancements on top of v0.1:
   - **Real local ML** (`aedi_sight/local_ml.py`) — replaces the v0.1 stubs.

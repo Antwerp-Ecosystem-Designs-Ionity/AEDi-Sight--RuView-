@@ -1,5 +1,7 @@
-// Visualizer tab — scrolling CSI waterfall.
+// Visualizer tab — scrolling CSI waterfall + live ML/vitals overlay.
 // Each frame on the WS bus arrives as { topic: 'csi', data: { node_id, freq_hz, amp:[...], phase:[...], rssi } }.
+// ML status (state/score) arrives on topic 'ml' (kind=status).
+// Breathing/heart rate arrives on topic 'vitals'.
 import { wsBus } from '../wsbus.js';
 
 export function initVisualizer() {
@@ -11,12 +13,15 @@ export function initVisualizer() {
   const pauseEl = document.getElementById('vizPause');
 
   let paused = false;
-  let lastByNode = {};  // node_id -> last amp[] for Δ mode
+  let lastByNode = {};        // node_id -> last amp[] for Δ mode
+  const mlByNode = {};        // node_id -> {state, score}
+  const vitByNode = {};       // node_id -> {br, hr}
   let col = 0;
   const H = cvs.height, W = cvs.width;
 
   // Pre-fill black
   ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+  drawOverlay();
 
   pauseEl.addEventListener('click', () => {
     paused = !paused; pauseEl.textContent = paused ? 'resume' : 'pause';
@@ -65,6 +70,60 @@ export function initVisualizer() {
     ctx.fillStyle = '#3a8bff';
     ctx.fillRect((col + 1) % W, 0, 1, H);
   }
+
+  // Overlay — top-left badge box listing per-node ML state + BR/HR.
+  function drawOverlay() {
+    // Clear a fixed strip at the top
+    ctx.save();
+    ctx.clearRect(0, 0, 360, 92);
+    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    ctx.fillRect(8, 8, 344, 84);
+    ctx.strokeStyle = 'rgba(58,139,255,0.55)';
+    ctx.strokeRect(8.5, 8.5, 343, 83);
+    ctx.font = '11px ui-monospace, JetBrains Mono, Menlo, monospace';
+    ctx.textBaseline = 'top';
+    ctx.fillStyle = '#3a8bff';
+    ctx.fillText('LIVE PER-NODE  ·  ML  /  VITALS', 18, 14);
+    ctx.fillStyle = '#c8d3e6';
+    const ids = Array.from(new Set([...Object.keys(mlByNode), ...Object.keys(vitByNode)])).sort();
+    if (!ids.length) {
+      ctx.fillStyle = '#8a96aa';
+      ctx.fillText('waiting for frames…', 18, 32);
+    } else {
+      let y = 30;
+      for (const id of ids.slice(0, 4)) {
+        const ml  = mlByNode[id]  || { state: '—', score: 0 };
+        const vit = vitByNode[id] || { br: null, hr: null };
+        const stCol = ml.state === 'spike'  ? '#ff4757'
+                    : ml.state === 'moving' ? '#f5b400'
+                    : ml.state === 'idle'   ? '#2ecc71' : '#8a96aa';
+        ctx.fillStyle = '#c8d3e6';
+        ctx.fillText(`#${id}`, 18, y);
+        ctx.fillStyle = stCol;
+        ctx.fillText(`${ml.state.padEnd(11)} ${ml.score.toFixed(2).padStart(5)}σ`, 44, y);
+        ctx.fillStyle = '#c8d3e6';
+        const br = vit.br != null ? `BR ${vit.br.toFixed(1)}` : 'BR —';
+        const hr = vit.hr != null ? `HR ${vit.hr.toFixed(0)}` : 'HR —';
+        ctx.fillText(`${br}   ${hr}`, 200, y);
+        y += 14;
+      }
+    }
+    ctx.restore();
+  }
+  // Repaint overlay every 500 ms so it doesn't get scrolled away by the waterfall col-bands.
+  setInterval(drawOverlay, 500);
+
+  wsBus.on('ml', m => {
+    const d = m.data;
+    if (d && d.kind === 'status' && d.node_id !== undefined) {
+      mlByNode[String(d.node_id)] = { state: d.state || '—', score: d.score || 0 };
+    }
+  });
+  wsBus.on('vitals', m => {
+    const d = m.data || {};
+    if (d.node_id === undefined) return;
+    vitByNode[String(d.node_id)] = { br: d.breathing_bpm, hr: d.heart_rate_bpm };
+  });
 
   // Update node filter list from /api/sink/stats
   async function refreshNodes() {

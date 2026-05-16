@@ -41,6 +41,8 @@ from . import gitops, ml, tools
 from .logbridge import BusHandler
 from .local_ml import LocalML
 from .esp_watchdog import EspWatchdog
+from .vitals import Vitals
+from . import state, ota, chat_stream
 
 log = logging.getLogger("aedi.server")
 STARTED = time.time()
@@ -87,7 +89,48 @@ async def api_provision(request: web.Request) -> web.Response:
     if err:
         return web.json_response({"error": err}, status=400)
     jid = request.app["jobs"].submit(spec)
+    # Persist non-secret args so we can pre-fill the form on next visit.
+    try:
+        state.remember(int(body.get("node_id", -1)), body)
+    except Exception:
+        pass
     return web.json_response({"job_id": jid, "label": spec.label})
+
+
+async def api_fleet_state(_request: web.Request) -> web.Response:
+    """Return the persisted-args table (passwords stripped)."""
+    return web.json_response({"nodes": state.all_nodes()})
+
+
+async def api_fleet_forget(request: web.Request) -> web.Response:
+    nid = int(request.match_info["nid"])
+    state.forget(nid)
+    return web.json_response({"forgot": nid})
+
+
+async def api_ota_reflash(request: web.Request) -> web.Response:
+    """Manually-triggered OTA reflash.
+
+    POST { "ip": "<addr>", "variant": "8mb"|"4mb"  }   (variant optional)
+    Returns the OTA result. Logs progress on WS topic 'log'.
+    """
+    body = await request.json()
+    ip = (body or {}).get("ip", "").strip()
+    variant = (body or {}).get("variant", "8mb")
+    if not ip:
+        return web.json_response({"error": "ip required"}, status=400)
+    res = await ota.reflash(request.app["bus"], ip, variant=variant)
+    return web.json_response(res, status=200 if res.get("rc", 1) == 0 else 502)
+
+
+async def api_chat_stream(request: web.Request) -> web.Response:
+    body = await request.json()
+    prompt = (body or {}).get("text", "").strip()
+    if not prompt:
+        return web.json_response({"error": "text required"}, status=400)
+    # Fire and forget — output streams via the 'chat' WS topic.
+    asyncio.create_task(chat_stream.stream_chat(request.app["bus"], prompt))
+    return web.json_response({"streaming": True, "prompt": prompt})
 
 
 async def api_sink_op(request: web.Request) -> web.Response:
@@ -234,6 +277,9 @@ def build_app() -> web.Application:
 
     local_ml = LocalML(bus)
     sink.add_consumer(local_ml.on_csi)
+    vitals_  = Vitals(bus)
+    if vitals_.enabled:
+        sink.add_consumer(vitals_.on_csi)
     watchdog = EspWatchdog(bus, sink)
 
     app = web.Application(client_max_size=4 << 20)
@@ -242,6 +288,7 @@ def build_app() -> web.Application:
     app["jobs"] = jobs
     app["log_handler"] = handler
     app["local_ml"] = local_ml
+    app["vitals"] = vitals_
     app["esp_watchdog"] = watchdog
 
     app.add_routes([
@@ -258,6 +305,10 @@ def build_app() -> web.Application:
         web.post("/api/ml/infer/{op}",     api_ml_infer),
         web.get("/api/ml/snapshot",        api_ml_snapshot),
         web.get("/api/watchdog/snapshot",  api_watchdog_snapshot),
+        web.get("/api/fleet/state",        api_fleet_state),
+        web.post("/api/fleet/forget/{nid}", api_fleet_forget),
+        web.post("/api/ota/reflash",       api_ota_reflash),
+        web.post("/api/chat/stream",       api_chat_stream),
         web.post("/api/chat",              api_chat),
         web.get("/api/logs/recent",        api_logs_recent),
         web.get("/api/git/status",         lambda r: api_git_status_passthrough(r)),

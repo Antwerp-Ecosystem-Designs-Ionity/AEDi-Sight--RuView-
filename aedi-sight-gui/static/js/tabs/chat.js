@@ -22,13 +22,16 @@ export function initChat() {
     if (!text) return;
     input.value = '';
     line('you »', text, 'ok');
+    // Slash-commands stay synchronous (cheap, local). Everything else streams.
+    const endpoint = text.startsWith('/') ? '/api/chat' : '/api/chat/stream';
     try {
-      const r = await fetch('/api/chat', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ text }) });
+      const r = await fetch(endpoint, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ text }) });
       const d = await r.json();
       if (d.lines) d.lines.forEach(l => line('··', l));
       if (d.reply) line('claude »', d.reply, 'info');
+      if (d.streaming) line('··', '(streaming…)', 'info');
     } catch (e) { line('!!', String(e), 'err'); }
   });
 
-  wsBus.on('chat', m => line('··', m.data.line || JSON.stringify(m.data), m.data.cls || ''));
+  wsBus.on('chat', m => line('claude »', m.data.line || JSON.stringify(m.data), m.data.cls || 'info'));
 }

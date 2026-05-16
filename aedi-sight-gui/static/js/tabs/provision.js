@@ -25,9 +25,33 @@ export function initProvision() {
       const s = await (await fetch('/api/status')).json();
       $('#provIp').value = s.host_ip || '';
       $('#provSsid').placeholder = s.host_ssid ? `e.g. ${s.host_ssid}` : 'SSID';
+      if (s.host_ssid)    $('#provSsid').value = s.host_ssid;
       if (s.host_channel) $('#provChannel').value = String(s.host_channel);
     } catch (_) { /* offline-friendly */ }
+    await loadPersisted();
   }
+
+  // Pre-fill from persisted args for the currently-selected node-id.
+  async function loadPersisted() {
+    try {
+      const r = await (await fetch('/api/fleet/state')).json();
+      const id = $('#provNodeId').value;
+      const saved = (r.nodes || {})[id];
+      if (!saved) return;
+      // Don't overwrite the SSID/IP autodetect with stale data — only fill
+      // fields the user can't infer from host context.
+      for (const [k, v] of Object.entries(saved)) {
+        const el = document.querySelector(`[name="${k}"]`);
+        if (!el || el.type === 'password') continue;
+        if (k === 'target_ip' || k === 'ssid' || k === 'channel') continue;
+        el.value = v;
+      }
+      appendLog(`pre-filled fields from saved settings for node ${id}`, 'info');
+    } catch (_) { /* fine */ }
+  }
+  document.addEventListener('change', e => {
+    if (e.target && e.target.id === 'provNodeId') loadPersisted();
+  });
 
   function appendLog(line, cls='') {
     const ts = new Date().toISOString().slice(11, 19);
