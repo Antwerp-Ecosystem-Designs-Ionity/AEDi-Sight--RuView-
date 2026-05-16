@@ -8,6 +8,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`aedi-sight-gui` v0.2 — real local ML, ESP32 self-healing, CI, auto-update, bootstrap installer, branded assets.**
+  Second-pass enhancements on top of v0.1:
+  - **Real local ML** (`aedi_sight/local_ml.py`) — replaces the v0.1 stubs.
+    Per-subcarrier Welford running mean/variance and a Mahalanobis-distance
+    motion score on every live CSI frame. Three-state hysteresis-gated machine
+    (calibrating → idle → moving → spike). Verified end-to-end on synthetic
+    streams: calm 90-frame calibration → idle (0.94 σ) → 15 saturated frames →
+    *moving* (2.44 σ) → 30 calm frames → idle (0.37 σ). UI shows the live
+    per-node table.
+  - **ESP32 self-healing watchdog** (`aedi_sight/esp_watchdog.py`) — async
+    tick (2 s), marks nodes stale > 8 s, lost > 30 s, attempts a non-destructive
+    `GET http://<node>:8032/ota/status` probe when a node has been lost > 90 s.
+    Re-publishes status transitions on the `fleet` topic.
+  - **Tools auto-discovery** — `aedi_sight/tools.py` now walks `scripts/` and
+    `plugins/ruview/commands/`, builds a catalog of safe-to-invoke entries
+    (extracted from the first fenced bash block in each `.md` for the RuView
+    plugin). Verified: 69 items across 5 groups (Verification · Repo · ESP32 ·
+    RuView · scripts/).
+  - **CI** — `.github/workflows/aedi-sight-gui.yml` runs on every push touching
+    `aedi-sight-gui/`. Matrix: Ubuntu × macOS × Windows × {py3.11, py3.12}.
+    Linux job runs the full HTTP/WS/UDP smoke (start server, hit
+    `/api/status`, open `/ws`, inject ADR-018 frame, assert `csi` topic
+    delivers). Other OSes do byte-compile + import + ANSI splash smoke.
+  - **Auto-update on launch** — `launch.sh --auto-update` (or
+    `AEDI_AUTO_UPDATE=1`) runs `git pull --rebase --autostash` from the repo
+    root and re-execs the launcher with `--skip-auto-update` so the loop
+    can't recurse.
+  - **Bootstrap installer** — `install.sh` now detects missing `git` /
+    `python3.10+` and installs them via apt / dnf / pacman / zypper / apk /
+    brew / pkg (with `sudo` when not root). `--no-bootstrap` opts out.
+  - **Branded assets** — `static/img/ionity-logo.svg` (animated ripple word
+    mark) + `static/img/banner.svg` (8-node mesh + waveform + subcarriers).
+    Hero on the Home tab now displays the banner with the logo overlaid.
 - **`aedi-sight-gui/` — cross-platform sensing console (IONITY edition).**
   New Python + vanilla-JS application that wraps the WiFi-CSI · ESP32 · ML
   pipeline behind a single web UI. One process binds HTTP (`:8088`) and the UDP

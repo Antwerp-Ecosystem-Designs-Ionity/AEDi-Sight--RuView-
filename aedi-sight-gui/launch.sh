@@ -20,6 +20,25 @@ fi
 # Make sure user-installed scripts are on PATH (esptool is installed there).
 export PATH="$HOME/.local/bin:$PATH"
 
+# Optional auto-update on launch — `--auto-update` or `AEDI_AUTO_UPDATE=1`.
+# Runs `git pull --rebase --autostash` from the repo root and re-execs the
+# launcher *once* with --skip-auto-update so we don't loop on stuck refs.
+case "${1:-}" in --auto-update) shift; AEDI_AUTO_UPDATE=1 ;; --skip-auto-update) shift; AEDI_AUTO_UPDATE=0 ;; esac
+if [ "${AEDI_AUTO_UPDATE:-0}" = "1" ]; then
+  REPO_ROOT="$(cd .. && pwd)"
+  if [ -d "$REPO_ROOT/.git" ] && command -v git >/dev/null 2>&1; then
+    echo "→ auto-update: git pull --rebase --autostash in $REPO_ROOT"
+    if git -C "$REPO_ROOT" pull --rebase --autostash >/tmp/aedi-auto-update.log 2>&1; then
+      echo "  ok — re-executing launcher"
+      exec "$0" --skip-auto-update "$@"
+    else
+      echo "  auto-update failed (see /tmp/aedi-auto-update.log) — continuing with current checkout"
+    fi
+  else
+    echo "  not a git checkout — skipping auto-update"
+  fi
+fi
+
 # Splash via the package
 PYTHONPATH="$PWD:${PYTHONPATH:-}" "$PY" -m aedi_sight.ansi || true
 

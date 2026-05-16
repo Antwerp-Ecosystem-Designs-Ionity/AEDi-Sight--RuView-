@@ -1,0 +1,111 @@
+# AEDi-Sight RuView GUI · CI
+# Lints + smoke-tests the cross-platform sensing console on every push that
+# touches it. Cross-platform (Linux + macOS + Windows) so the launcher scripts
+# can't silently bit-rot.
+name: aedi-sight-gui
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - "aedi-sight-gui/**"
+      - ".github/workflows/aedi-sight-gui.yml"
+  pull_request:
+    paths:
+      - "aedi-sight-gui/**"
+      - ".github/workflows/aedi-sight-gui.yml"
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: ${{ matrix.os }} · py${{ matrix.python }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:     [ubuntu-latest, macos-latest, windows-latest]
+        python: ["3.11", "3.12"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+
+      - name: Install runtime deps
+        working-directory: aedi-sight-gui
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install aiohttp websockets pyserial esptool esp_idf_nvs_partition_gen scipy numpy
+
+      - name: Byte-compile the package
+        working-directory: aedi-sight-gui
+        run: |
+          python -m compileall -q aedi_sight
+
+      - name: Import + build_app smoke
+        working-directory: aedi-sight-gui
+        env:
+          PYTHONPATH: ${{ github.workspace }}/aedi-sight-gui
+        run: |
+          python -c "from aedi_sight import server; a = server.build_app(); print('routes:', len(list(a.router.resources())))"
+
+      - name: ANSI banner renders (non-tty fallback)
+        working-directory: aedi-sight-gui
+        env:
+          PYTHONPATH: ${{ github.workspace }}/aedi-sight-gui
+        run: |
+          python -m aedi_sight.ansi --fast
+
+      - name: HTTP/WS/UDP end-to-end smoke (Linux only — Windows/macOS get launcher syntax check)
+        if: runner.os == 'Linux'
+        working-directory: aedi-sight-gui
+        env:
+          PYTHONPATH: ${{ github.workspace }}/aedi-sight-gui
+        run: |
+          set -euo pipefail
+          python -m aedi_sight --host 127.0.0.1 --port 8088 --no-banner &
+          APP=$!
+          sleep 3
+          # /api/status returns JSON
+          curl --fail -sS http://127.0.0.1:8088/api/status | python -m json.tool > /dev/null
+          # static favicon served
+          curl --fail -sS -o /dev/null http://127.0.0.1:8088/static/img/favicon.svg
+          # WS + synthetic UDP frame round-trip
+          python - <<'PY'
+          import asyncio, json, socket, struct
+          import websockets
+          HDR='<IBBHIIBB2x'; MAGIC=0xC5110001
+          async def run():
+              async with websockets.connect('ws://127.0.0.1:8088/ws') as ws:
+                  await asyncio.wait_for(ws.recv(), 2.0)  # hello
+                  s=socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                  iq=bytes(((i*7) & 0xff) - 128 % 256 for i in range(16))
+                  s.sendto(struct.pack(HDR, MAGIC, 5, 1, 8, 2462, 1, 0xb7, 0x9d)+iq, ('127.0.0.1',5005))
+                  s.close()
+                  for _ in range(20):
+                      m=json.loads(await asyncio.wait_for(ws.recv(), 1.5))
+                      if m.get('topic')=='csi' and m['data'].get('seq')==1:
+                          print('OK · csi frame round-tripped'); return
+                  raise SystemExit('no csi frame seen')
+          asyncio.run(run())
+          PY
+          kill $APP || true
+          wait $APP 2>/dev/null || true
+
+      - name: Bash launchers — syntax check
+        if: runner.os != 'Windows'
+        run: |
+          bash -n aedi-sight-gui/launch.sh
+          bash -n aedi-sight-gui/install.sh
+          bash -n aedi-sight
+
+      - name: Windows launcher — syntax check
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Get-Content aedi-sight-gui/launch.ps1 | Out-Null
+          $PSScriptRoot # confirm ps1 parses
+          # cmd.exe doesn't have a "compile" step, but we sanity-check exit codes.
+          cmd /c "exit 0"

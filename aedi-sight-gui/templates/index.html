@@ -76,14 +76,18 @@
     <!-- Tabs are rendered dynamically by app.js — each section is a <section data-tab="..."> -->
 
     <section data-tab="home" class="tab is-active">
-      <div class="hero">
-        <h1>Sensing without cameras.</h1>
-        <p class="sub">8-node ESP32-S3 TDMA mesh · channel-state radar · pose, vitals, presence.</p>
-        <div class="quick">
-          <button class="btn primary" data-go="provision">Provision a node</button>
-          <button class="btn" data-go="sink">Start the sink</button>
-          <button class="btn" data-go="visualizer">Open visualizer</button>
-          <button class="btn ghost" data-go="chat">Talk to Claude</button>
+      <div class="hero hero--banner">
+        <img class="hero-bg" src="/static/img/banner.svg" alt="" aria-hidden="true"/>
+        <div class="hero-fade"></div>
+        <div class="hero-inner">
+          <img class="hero-logo" src="/static/img/ionity-logo.svg" alt="IONITY · AEDi-Sight RuView" />
+          <div class="quick">
+            <button class="btn primary" data-go="provision">Provision a node</button>
+            <button class="btn" data-go="sink">Start the sink</button>
+            <button class="btn" data-go="visualizer">Open visualizer</button>
+            <button class="btn" data-go="ml">Live ML</button>
+            <button class="btn ghost" data-go="chat">Talk to Claude</button>
+          </div>
         </div>
       </div>
       <div class="cards">
@@ -244,29 +248,50 @@
     </section>
 
     <section data-tab="ml" class="tab">
-      <header class="tab-head"><h2>ML</h2><p class="sub">Local + cloud training and inference. Models are RVF containers (signed, ed25519).</p></header>
+      <header class="tab-head">
+        <h2>ML</h2>
+        <p class="sub">Local Welford running stats + Mahalanobis anomaly detection on every live frame. No simulation — numbers come from the live UDP stream.</p>
+      </header>
       <div class="cards">
+        <div class="card flex2">
+          <h3>Live per-node state</h3>
+          <table class="fleet">
+            <thead><tr><th>Node</th><th>State</th><th>Score (σ)</th><th>RSSI</th><th>Samples</th><th>Since</th></tr></thead>
+            <tbody id="mlNodeTable"></tbody>
+          </table>
+          <p class="dim" style="font-size:12px;margin-top:8px">
+            <strong>calibrating</strong> · learning empty-room baseline (first 60 frames per node).
+            <strong>idle</strong> · score below move threshold (<code>σ ≤ 2.5</code>).
+            <strong>moving</strong> · sustained motion (3-frame hysteresis).
+            <strong>spike</strong> · transient large deviation (<code>σ &gt; 6.0</code>).
+          </p>
+        </div>
         <div class="card">
-          <h3>Local models</h3>
-          <table class="fleet"><thead><tr><th>Name</th><th>Size</th><th>Modified</th><th></th></tr></thead><tbody id="mlModels"></tbody></table>
+          <h3>Inference control</h3>
+          <div class="row gap">
+            <button class="btn primary" id="mlInferStart">Start / resume</button>
+            <button class="btn" id="mlInferStop">Pause</button>
+            <button class="btn ghost" id="mlInferReset">Reset baseline</button>
+          </div>
+          <div class="kv"><span>Enabled</span><span id="mlEnabled">—</span></div>
+          <div class="kv"><span>Move thresh</span><span id="mlMove">—</span></div>
+          <div class="kv"><span>Spike thresh</span><span id="mlSpike">—</span></div>
+          <div class="kv"><span>Calib frames</span><span id="mlCalib">—</span></div>
+        </div>
+        <div class="card">
+          <h3>Local models on disk</h3>
+          <table class="fleet"><thead><tr><th>Name</th><th>Size</th><th>Modified</th></tr></thead><tbody id="mlModels"></tbody></table>
           <button class="btn xs" id="mlRefresh">refresh</button>
         </div>
         <div class="card">
-          <h3>Train</h3>
+          <h3>Train jobs</h3>
+          <p class="dim" style="font-size:12px">Calls the repo's training scripts when present; stubs out when they aren't checked in.</p>
           <div class="row gap">
             <button class="btn" data-mljob="contrastive">Contrastive pretrain</button>
             <button class="btn" data-mljob="pose">Pose head fine-tune</button>
             <button class="btn ghost" data-mljob="benchmark">Bench vital signs</button>
           </div>
           <pre id="mlLog" class="log"></pre>
-        </div>
-        <div class="card">
-          <h3>Inference</h3>
-          <div class="row gap">
-            <button class="btn" id="mlInferStart">Start inference</button>
-            <button class="btn" id="mlInferStop">Stop</button>
-          </div>
-          <div class="kv"><span>Output</span><span id="mlOut">idle</span></div>
         </div>
       </div>
     </section>

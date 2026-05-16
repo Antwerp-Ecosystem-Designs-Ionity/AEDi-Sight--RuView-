@@ -1,4 +1,4 @@
-// ML tab — list local models, kick off training jobs, view live stdout via WS topic 'ml'.
+// ML tab — wires the live per-node anomaly table to the LocalML server module.
 import { wsBus } from '../wsbus.js';
 
 export function initML() {
@@ -11,6 +11,56 @@ export function initML() {
   }
   function esc(s) { return String(s).replace(/[<&]/g, c => ({ '<':'&lt;','&':'&amp;' }[c])); }
 
+  // ── snapshot (renders the per-node live table) ──
+  let nodeState = {};   // node_id → {state, score, samples, rssi, since}
+  function renderTable() {
+    const tb = $('#mlNodeTable'); tb.innerHTML = '';
+    const ids = Object.keys(nodeState).sort();
+    if (!ids.length) {
+      tb.innerHTML = `<tr><td colspan="6" class="dim">no nodes seen yet — start the sink + power on a provisioned ESP32</td></tr>`;
+      return;
+    }
+    const now = Date.now()/1000;
+    for (const id of ids) {
+      const n = nodeState[id];
+      const cls = n.state === 'spike' ? 'err' :
+                  n.state === 'moving' ? 'warn' :
+                  n.state === 'idle'   ? 'ok'   : '';
+      const since = n.since ? `${(now - n.since).toFixed(0)}s` : '—';
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td class="mono">#${id}</td>
+                      <td class="${cls}">${n.state}</td>
+                      <td class="mono">${(n.score || 0).toFixed(2)}</td>
+                      <td class="mono">${n.rssi ?? '—'}</td>
+                      <td class="mono">${n.samples}</td>
+                      <td class="mono">${since}</td>`;
+      tb.appendChild(tr);
+    }
+  }
+
+  async function refreshSnapshot() {
+    try {
+      const r = await fetch('/api/ml/snapshot'); const s = await r.json();
+      $('#mlEnabled').textContent = s.enabled ? 'yes' : 'paused';
+      $('#mlMove').textContent    = s.move_thresh ?? '—';
+      $('#mlSpike').textContent   = s.spike_thresh ?? '—';
+      $('#mlCalib').textContent   = s.calib_frames ?? '—';
+      nodeState = s.nodes || {};
+      renderTable();
+    } catch (_) {}
+  }
+
+  wsBus.on('ml', m => {
+    const d = m.data;
+    if (!d) return;
+    if (d.kind === 'status' && d.node_id !== undefined) {
+      nodeState[d.node_id] = { state: d.state, score: d.score, samples: d.samples, rssi: d.rssi, since: d.since };
+      renderTable();
+    } else if (d.line) {
+      append(d.line, d.cls || '');
+    }
+  });
+
   async function refreshModels() {
     try {
       const r = await fetch('/api/ml/models'); const d = await r.json();
@@ -19,11 +69,10 @@ export function initML() {
         const tr = document.createElement('tr');
         tr.innerHTML = `<td class="mono">${m.name}</td>
                         <td class="mono">${(m.size/1024).toFixed(1)} KB</td>
-                        <td class="mono">${m.mtime ? new Date(m.mtime*1000).toLocaleString() : '—'}</td>
-                        <td><button class="btn xs" data-load="${m.name}">load</button></td>`;
+                        <td class="mono">${m.mtime ? new Date(m.mtime*1000).toLocaleString() : '—'}</td>`;
         tb.appendChild(tr);
       });
-      if (!d.models?.length) tb.innerHTML = `<tr><td colspan="4" class="dim">no models found — train one or drop an .rvf into models/</td></tr>`;
+      if (!d.models?.length) tb.innerHTML = `<tr><td colspan="3" class="dim">no models on disk yet</td></tr>`;
     } catch (e) { append(String(e), 'err'); }
   }
 
@@ -36,11 +85,14 @@ export function initML() {
     } catch (e) { append(String(e), 'err'); }
   }));
 
-  $('#mlInferStart').addEventListener('click', () => fetch('/api/ml/infer/start', { method:'POST' }));
-  $('#mlInferStop' ).addEventListener('click', () => fetch('/api/ml/infer/stop',  { method:'POST' }));
+  $('#mlInferStart').addEventListener('click', () => fetch('/api/ml/infer/start', { method:'POST' }).then(refreshSnapshot));
+  $('#mlInferStop' ).addEventListener('click', () => fetch('/api/ml/infer/stop',  { method:'POST' }).then(refreshSnapshot));
+  $('#mlInferReset').addEventListener('click', () => fetch('/api/ml/infer/reset', { method:'POST' }).then(refreshSnapshot));
   $('#mlRefresh').addEventListener('click', refreshModels);
 
-  wsBus.on('ml', m => append(m.data.line || JSON.stringify(m.data), m.data.cls || ''));
-  document.addEventListener('tab:activate', e => { if (e.detail.id === 'ml') refreshModels(); });
-  refreshModels();
+  document.addEventListener('tab:activate', e => {
+    if (e.detail.id === 'ml') { refreshSnapshot(); refreshModels(); }
+  });
+  refreshSnapshot(); refreshModels();
+  setInterval(() => { if (document.querySelector('section[data-tab="ml"]').classList.contains('is-active')) refreshSnapshot(); }, 1500);
 }

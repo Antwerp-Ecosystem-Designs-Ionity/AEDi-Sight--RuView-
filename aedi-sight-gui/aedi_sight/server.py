@@ -39,6 +39,8 @@ from .provision import build_spec as build_prov_spec, list_serial_ports
 from .chat    import handle as chat_handle
 from . import gitops, ml, tools
 from .logbridge import BusHandler
+from .local_ml import LocalML
+from .esp_watchdog import EspWatchdog
 
 log = logging.getLogger("aedi.server")
 STARTED = time.time()
@@ -144,9 +146,25 @@ async def api_ml_job(request: web.Request) -> web.Response:
 
 async def api_ml_infer(request: web.Request) -> web.Response:
     op = request.match_info["op"]
-    # Inference loop is currently a stub — emit a single status message.
-    request.app["bus"].publish("ml", {"line": f"inference {op} (stub)", "cls": "info"})
-    return web.json_response({"ok": True})
+    local: LocalML = request.app["local_ml"]
+    if op == "start":
+        local.set_enabled(True)
+    elif op == "stop":
+        local.set_enabled(False)
+    elif op == "reset":
+        local.reset()
+    else:
+        return web.json_response({"error": "unknown op"}, status=404)
+    return web.json_response({"enabled": local.enabled, "snapshot": local.snapshot()})
+
+
+async def api_ml_snapshot(request: web.Request) -> web.Response:
+    """One-shot snapshot of LocalML state — used by the ML tab for the table."""
+    return web.json_response(request.app["local_ml"].snapshot())
+
+
+async def api_watchdog_snapshot(request: web.Request) -> web.Response:
+    return web.json_response(request.app["esp_watchdog"].snapshot())
 
 
 async def api_chat(request: web.Request) -> web.Response:
@@ -214,11 +232,17 @@ def build_app() -> web.Application:
         except Exception:
             pass
 
+    local_ml = LocalML(bus)
+    sink.add_consumer(local_ml.on_csi)
+    watchdog = EspWatchdog(bus, sink)
+
     app = web.Application(client_max_size=4 << 20)
     app["bus"] = bus
     app["sink"] = sink
     app["jobs"] = jobs
     app["log_handler"] = handler
+    app["local_ml"] = local_ml
+    app["esp_watchdog"] = watchdog
 
     app.add_routes([
         web.get("/",                       index),
@@ -232,6 +256,8 @@ def build_app() -> web.Application:
         web.get("/api/ml/models",          api_ml_models),
         web.post("/api/ml/job",            api_ml_job),
         web.post("/api/ml/infer/{op}",     api_ml_infer),
+        web.get("/api/ml/snapshot",        api_ml_snapshot),
+        web.get("/api/watchdog/snapshot",  api_watchdog_snapshot),
         web.post("/api/chat",              api_chat),
         web.get("/api/logs/recent",        api_logs_recent),
         web.get("/api/git/status",         lambda r: api_git_status_passthrough(r)),
@@ -248,8 +274,14 @@ def build_app() -> web.Application:
             await sink.start()
         except OSError as e:
             log.warning("sink start failed: %s — start it from the Sink tab.", e)
+        try:
+            await watchdog.start()
+        except Exception as e:
+            log.warning("watchdog start failed: %s", e)
 
     async def on_cleanup(app):
+        try: await watchdog.stop()
+        except Exception: pass
         try: await sink.stop()
         except Exception: pass
 

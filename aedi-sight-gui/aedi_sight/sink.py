@@ -52,6 +52,10 @@ class UdpSink:
         self.total = 0
         self.nodes: Dict[int, NodeStats] = {}
         self._running = False
+        # Optional consumer hooks (LocalML, EspWatchdog, etc.).
+        # Each hook is called as fn(frame_dict) for every decoded frame.
+        # Hooks must be fast + non-blocking — they run on the asyncio loop.
+        self._consumers: list = []
 
     async def start(self) -> None:
         if self._running:
@@ -130,11 +134,9 @@ class UdpSink:
         st.rate_window.append(st.last_seen)
         self.total += 1
 
-        last = self._last_broadcast.get(nid, 0.0)
-        if (st.last_seen - last) < self.broadcast_interval:
-            return
-        self._last_broadcast[nid] = st.last_seen
-        # Decode IQ → amplitude + phase (downsample by 1 — full subcarrier set is fine).
+        # Always decode IQ → amplitude + phase. ML/watchdog consumers need
+        # *every* frame; only the WS bus publish below is rate-limited so the
+        # browser doesn't drown.
         iq_count = n_ant * n_sc
         need = HEADER_SIZE + iq_count * 2
         if len(data) < need:
@@ -147,7 +149,7 @@ class UdpSink:
             amps[k]   = math.sqrt(i*i + q*q)
             phases[k] = math.atan2(q, i)
 
-        self.bus.publish("csi", {
+        frame = {
             "node_id": nid,
             "freq_hz": freq,
             "seq":     seq,
@@ -157,9 +159,26 @@ class UdpSink:
             "n_sc":    n_sc,
             "amp":     amps,
             "phase":   phases,
-        })
+        }
+        # Hooks first — fire-and-forget, can't kill the sink.
+        for cb in self._consumers:
+            try: cb(frame)
+            except Exception as e: log.debug("consumer error: %s", e)
+
+        # WS bus publish is rate-limited per-node so the browser stays responsive.
+        last = self._last_broadcast.get(nid, 0.0)
+        if (st.last_seen - last) < self.broadcast_interval:
+            return
+        self._last_broadcast[nid] = st.last_seen
+
+        self.bus.publish("csi", frame)
         # also publish a lightweight fleet ping for the provision tab
         self.bus.publish("fleet", {"node_id": nid, "rssi": rssi, "seq": seq, "ts": st.last_seen})
+
+    def add_consumer(self, fn) -> None:
+        """Subscribe a callable to every decoded frame."""
+        if fn not in self._consumers:
+            self._consumers.append(fn)
 
 
 class _Proto(asyncio.DatagramProtocol):

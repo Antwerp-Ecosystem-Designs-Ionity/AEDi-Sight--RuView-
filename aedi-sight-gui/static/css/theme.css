@@ -176,6 +176,14 @@ th { color: var(--muted); font-weight: 500; text-transform: uppercase; letter-sp
 .hero h1 { background: linear-gradient(90deg, #fff, var(--ionity-azure)); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .hero .quick { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
 
+/* Hero — banner variant (Home tab) */
+.hero.hero--banner { position: relative; padding: 0; overflow: hidden; }
+.hero-bg     { display: block; width: 100%; height: auto; }
+.hero-fade   { position: absolute; inset: 0; background: linear-gradient(180deg, transparent 50%, var(--ink-2) 100%); pointer-events: none; }
+.hero-inner  { position: absolute; left: 28px; right: 28px; bottom: 24px; display: flex; align-items: end; justify-content: space-between; gap: 18px; flex-wrap: wrap; }
+.hero-logo   { width: min(360px, 50vw); height: auto; filter: drop-shadow(0 4px 20px rgba(0,0,0,0.6)); }
+.hero--banner .quick { margin-top: 0; }
+
 /* Intro veil */
 .intro-veil {
   position: fixed; inset: 0; z-index: 999;
