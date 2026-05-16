@@ -371,6 +371,23 @@ tr:hover td     { background: rgba(58,139,255,0.04); }
   pointer-events: none;
 }
 
+/* ── brand image overrides ──────────────────────────────────── */
+/* The IONITY source SVGs are 3000–4800px wide. Cap them so the chrome
+   doesn't blow out, but keep `object-fit:contain` so the artwork stays
+   centred and proportional. The header brand-mark switches from inline
+   SVG to <img> when the real logo is wired up. */
+.brand           { text-decoration: none; color: inherit; cursor: pointer; }
+.brand:hover     { text-decoration: none; }
+.brand-mark      { width: 40px; height: 40px; flex-shrink: 0; object-fit: contain; display: block; }
+.hero-logo-real  { display: block; width: clamp(220px, 28vw, 360px); height: auto;
+                   margin-bottom: 14px; filter: drop-shadow(0 4px 24px rgba(0,0,0,0.55)); }
+.intro-logo-real { width: min(440px, 70vw); height: auto;
+                   filter: drop-shadow(0 6px 30px rgba(58,139,255,0.4)); user-select: none;
+                   opacity: 0; animation: introIn 800ms var(--ease) 600ms forwards;
+                   margin-bottom: 8px; }
+.about-portrait  { width: 96px; height: 96px; border-radius: 50%; object-fit: cover;
+                   border: 2px solid var(--rule-strong); margin-right: 14px; vertical-align: middle; }
+
 /* ── intro veil (1.6s sequenced) ───────────────────────────── */
 .intro-veil {
   position: fixed; inset: 0; z-index: 999;

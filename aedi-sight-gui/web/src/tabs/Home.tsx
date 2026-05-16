@@ -5,6 +5,10 @@ export function Home() {
   return (
     <>
       <div className="hero">
+        <img className="hero-logo-real"
+             src="/static/img/brand/logo-white.svg"
+             alt="IONITY"
+             draggable={false} />
         <span className="hero-eyebrow"><span className="status-dot on" />AEDi-Sight RuView · live console</span>
         <h1>Sensing without cameras.</h1>
         <p className="lead">8-node ESP32-S3 TDMA mesh · channel-state radar · pose, breathing, heartbeat, presence — all from the WiFi already in the room. This is the control surface: provision, observe, analyse, update.</p>
@@ -20,28 +24,12 @@ export function Home() {
           <MetaTile num={status?.host_ip || "—"}                lbl="host ip" mono />
           <MetaTile num={status?.host_ssid || "—"}              lbl="wifi ssid" mono />
         </div>
-        <svg className="hero-deco" viewBox="0 0 200 200" aria-hidden="true">
-          <defs>
-            <radialGradient id="hd" cx="0.5" cy="0.5" r="0.5">
-              <stop offset="0" stopColor="#3a8bff" stopOpacity={0.5} />
-              <stop offset="1" stopColor="#3a8bff" stopOpacity={0} />
-            </radialGradient>
-          </defs>
-          <circle cx={100} cy={100} r={98} fill="url(#hd)" />
-          <g fill="none" stroke="#3a8bff" strokeWidth={0.6} opacity={0.5}>
-            <circle cx={100} cy={100} r={80} />
-            <circle cx={100} cy={100} r={56} />
-            <circle cx={100} cy={100} r={32} />
-          </g>
-          <g fill="#3a8bff">
-            {[0,1,2,3,4,5,6,7].map(i => {
-              const a = (i / 8) * Math.PI * 2 - Math.PI / 2;
-              const x = 100 + Math.cos(a) * 80, y = 100 + Math.sin(a) * 80;
-              return <circle key={i} cx={x} cy={y} r={3} />;
-            })}
-          </g>
-          <circle cx={100} cy={100} r={5} fill="#fff" />
-        </svg>
+        <img className="hero-deco"
+             src="/static/img/brand/aedi-logo.svg"
+             alt=""
+             aria-hidden="true"
+             draggable={false}
+             style={{ width: 360, opacity: 0.32 }} />
       </div>
       <div className="cards">
         <Card title="Sensing pipeline">

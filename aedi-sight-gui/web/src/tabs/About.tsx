@@ -6,8 +6,14 @@ export function About() {
         <div className="card">
           <h3>AEDi-Sight RuView · IONITY edition</h3>
           <p>Cross-platform sensing console for the WiFi-CSI · ESP32-S3 TDMA mesh.</p>
+          <div style={{ display: "flex", alignItems: "center", marginTop: 12, marginBottom: 12 }}>
+            <img className="about-portrait" src="/static/img/brand/author-johan.svg" alt="Johan Wilhelm van Antwerp" />
+            <div>
+              <strong style={{ display: "block", color: "#fff" }}>Johan Wilhelm van Antwerp</strong>
+              <span className="dim" style={{ fontSize: 12 }}>Author · IONITY · Antwerp Designs</span>
+            </div>
+          </div>
           <ul className="mini">
-            <li>Author · <strong>Johan Wilhelm van Antwerp</strong></li>
             <li>IONITY · <a href="https://www.ionity.today" target="_blank" rel="noreferrer">ionity.today</a> · <a href="https://ionity.world" target="_blank" rel="noreferrer">ionity.world</a></li>
             <li>Antwerp Designs · 2018 – 2026</li>
             <li>Theme · BLUE · WHITE · BLACK</li>

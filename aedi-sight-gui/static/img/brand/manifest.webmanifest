@@ -1,0 +1,15 @@
+{
+  "name": "AEDi-Sight RuView · IONITY",
+  "short_name": "AEDi-Sight",
+  "description": "WiFi-CSI sensing console — Antwerp Designs · IONITY",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#06080f",
+  "theme_color": "#0a3df0",
+  "categories": ["utilities", "productivity"],
+  "icons": [
+    { "src": "/static/img/brand/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/static/img/brand/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

@@ -107,11 +107,10 @@ export function Intro() {
     <div className={"intro-veil" + (progress >= 100 ? " is-gone" : "")}>
       <canvas ref={cvsRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", zIndex: 0, pointerEvents: "none" }} />
       <div className="intro-inner" style={{ position: "relative", zIndex: 1 }}>
-        <div className="intro-rings" aria-hidden="true">
-          <span /><span /><span /><span />
-          <div className="core" />
-        </div>
-        <div className="intro-word">IONITY</div>
+        <img className="intro-logo-real"
+             src="/static/img/brand/logo-white.svg"
+             alt="IONITY"
+             draggable={false} />
         <div className="intro-tag">AEDi-Sight RuView · WiFi-CSI Sensing Console</div>
         <div className="intro-prog"><div className="intro-prog-bar" style={{ width: `${progress}%` }} /></div>
         <div className="intro-meta">
