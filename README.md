@@ -518,6 +518,7 @@ Verify the plugin structure: `bash plugins/ruview/scripts/smoke.sh`. Full detail
 | Document | Description |
 |----------|-------------|
 | [User Guide](docs/user-guide.md) | Step-by-step guide: installation, first run, API usage, hardware setup, training |
+| [AEDi-Sight RuView console (`aedi-sight-gui`)](docs/aedi-sight-gui.md) | Cross-platform sensing console — React + TypeScript + Vite front-end · aiohttp backend · live UDP CSI ingest · ESP32 flash + provision · live ML (Welford + Mahalanobis) + scipy vitals · ESP32 self-healing watchdog · `claude-flow` chat. Auto-builds the React bundle on first launch. |
 | [Build Guide](docs/build-guide.md) | Building from source (Rust and Python) |
 | [Claude Code / Codex Plugin](plugins/ruview/README.md) | The `ruview` plugin + marketplace — skills, `/ruview-*` commands, agents, and the Codex prompt mirror |
 | [Architecture Decisions](docs/adr/README.md) | 96 ADRs — why each technical choice was made, organized by domain (hardware, signal processing, ML, platform, infrastructure) |

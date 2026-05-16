@@ -8,6 +8,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`aedi-sight-gui` v0.5 — React 18 + TypeScript + Vite port of the front-end.**
+  Sub-project [`aedi-sight-gui/web/`](aedi-sight-gui/web/) is the canonical UI
+  going forward. Vanilla-JS modules in `aedi-sight-gui/static/js/*` remain as
+  the off-by-default fallback.
+  - **Stack**: React 18 · TypeScript · Vite. Vite emits to
+    `aedi-sight-gui/static/dist/`; the existing aiohttp `/static` fanout
+    serves the bundle. The server `/` handler prefers `static/dist/index.html`
+    over the legacy template when present.
+  - **Hooks**: `useWebSocket()` (topic-multiplexed, typed, auto-reconnect),
+    `usePolled<T>` + `api<T>()` (typed REST). Shared `types.ts` mirrors every
+    server contract (Status, SinkStats, CsiFrame, VitalsPayload, MlSnapshot,
+    LibsManifest, RuViewSnapshot, FleetSnapshot, SerialPort, …).
+  - **Components**: `<Intro/>` Canvas radar sweep → 8-node mesh → core pulse →
+    word lock-in animation. `<Header/>` gradient brand mark + 5 status pills.
+    `<Sparkline/>` shared ring-buffer canvas. 16 inline-SVG icons as JSX.
+  - **13 tabs** ported, all live-data backed: Home · Provision · Sink ·
+    Visualizer · MLVitals · Debug · Chat · Libraries · RuView · Tools · Logs ·
+    Updates · About.
+  - **Auto-build**: `launch.sh` + `install.sh` run `npm install --no-bin-links`
+    + `vite build` when Node/npm are present (exFAT-safe). `AEDI_SKIP_WEB_BUILD=1`
+    opts out. CI matrix unchanged (Ubuntu × macOS × Windows · py3.11 / py3.12).
+  - **Verified on Pi 5 / Debian / Node 24**: `npm install` adds 67 packages,
+    `vite build` emits a 199 KB JS bundle (62 KB gzipped) + 0.67 KB HTML,
+    server serves it from `/`, all `/api/*` endpoints respond 200.
 - **`aedi-sight-gui` v0.3 — scipy vitals, OTA reflash, persisted per-node settings, streaming chat, ML overlay on visualizer.**
   Third-pass additions:
   - **scipy vitals** (`aedi_sight/vitals.py`) — `scipy.signal.welch` on a rolling

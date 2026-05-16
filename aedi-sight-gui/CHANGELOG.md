@@ -3,6 +3,71 @@
 All notable changes to the cross-platform sensing console. The repo-wide
 [CHANGELOG.md](../CHANGELOG.md) is the canonical source for everything else.
 
+## [0.5.0] — 2026-05-16 · React port
+
+### Added
+- **Full React 18 + TypeScript + Vite front-end** in [`web/`](web/), built to
+  [`static/dist/`](static/dist/). The aiohttp `/` handler now prefers
+  `static/dist/index.html` when present, falls back to the vanilla
+  `templates/index.html` otherwise — both UIs share the same `/api/*` + `/ws`
+  contracts and the same Python backend.
+- **Hooks**:
+  - `useWebSocket()` — topic-multiplexed `/ws` bus, typed `subscribe<T>` /
+    `send`, auto-reconnect with exponential backoff.
+  - `usePolled<T>(url, intervalMs, active)` — re-fetches on a timer; cleans
+    up on unmount.
+  - `api<T>(method, url, body?)` — typed one-shot REST helper.
+- **Shared types** in [`web/src/types.ts`](web/src/types.ts) mirror every server
+  contract: `Status`, `SinkStats`, `CsiFrame`, `VitalsPayload`, `MlSnapshot`,
+  `LibsManifest`, `RuViewSnapshot`, `FleetSnapshot`, `SerialPort`, …
+- **Components**:
+  - `<Intro/>` — Canvas radar sweep + concentric rings + 8 mesh nodes lighting
+    up + central core pulse + "IONITY" word lock-in + progress bar. 2.2 s
+    sequence, fades out, then unmounts.
+  - `<Header/>` — gradient brand mark + dual-line title + 5 labelled status
+    pills (sink fps + dot, SSID, IP, version, WS state).
+  - `<Sparkline channel="…"/>` — DPR-aware canvas with a shared per-key ring
+    buffer; the gradient fill + last-point dot match the legacy vanilla look.
+  - `<Icon.*/>` — 16 inline-SVG line icons as JSX components.
+- **13 tabs** ported, all live-data backed (no simulation):
+  Home · Provision · Sink · Visualizer · MLVitals · Debug · Chat · Libraries ·
+  RuView · Tools · Logs · Updates · About.
+  - **Provision**: form auto-fills SSID / IP / channel from host status,
+    pulls per-node persisted args from `/api/fleet/state`, has a
+    *Plan fleet* button that walks the live fleet table to pick the next
+    free `node_id` / `tdm_slot`.
+  - **Sink**: per-row inline rate + RSSI sparklines and a `confirm()`-gated
+    OTA reflash button (POSTs to `<node-ip>:8032/ota`).
+  - **MLVitals**: per-node Mahalanobis σ sparkline with stroke colour tied
+    to state (green idle / amber moving / red spike), plus BR / HR columns
+    from `scipy.signal.welch` output.
+  - **Visualizer**: scrolling subcarrier waterfall in canvas, with a
+    top-left overlay showing per-node state badge + BR / HR (repaints
+    every 500 ms).
+  - **Tools**: modal opens on every script with a `--help` / source
+    preview pulled from `/api/tools/help?id=…` and a shlex-split args
+    input before running.
+  - **Debug**: live ESP32 serial monitor, NVS dump + parse, sink counters.
+- **Launcher / installer auto-build**: `launch.sh` and `install.sh` run
+  `npm install --no-bin-links` + `vite build` when Node/npm are present.
+  `--no-bin-links` is mandatory on exFAT (no symlink support) and harmless
+  on real filesystems. `AEDI_SKIP_WEB_BUILD=1` forces the vanilla path.
+- **Vite dev server** proxies `/api` (HTTP) and `/ws` (WebSocket) to the
+  Python backend on `:8088` — `cd web && npm run dev` gives you HMR while
+  hitting the live UDP sink.
+
+### Changed
+- `aiohttp` `index` handler — picks `static/dist/index.html` first, then
+  `templates/index.html`.
+- Bundle output: **~199 KB JS / ~62 KB gzipped / 0.67 KB HTML** on the first
+  build. Source map shipped alongside.
+
+### Notes
+- The vanilla JS modules in `static/js/*` are still on disk and still work;
+  they're the off-by-default fallback for environments without Node.
+- `web/node_modules/`, `web/dist/`, `static/dist/`, and `*.tsbuildinfo` are
+  gitignored. The committed surface is sources only.
+
 ## [0.1.0] — 2026-05-16
 
 ### Added

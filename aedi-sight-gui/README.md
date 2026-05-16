@@ -2,10 +2,15 @@
 
 Cross-platform sensing console for the WiFi-CSI · ESP32-S3 TDMA mesh.
 
-One process · web UI · WebSocket bus · UDP CSI ingest · ESP32 flash + provision · ML jobs · `claude-flow` chat · git updates. Linux / macOS / Windows. Theme: **blue · white · black**.
+One process · React UI · WebSocket bus · UDP CSI ingest · ESP32 flash + provision · live ML + vitals · `claude-flow` chat · git updates. Linux / macOS / Windows. Theme: **blue · white · black**.
 
 Author · **Johan Wilhelm van Antwerp** · [ionity.today](https://www.ionity.today) · [ionity.world](https://ionity.world)
 Antwerp Designs · 2018 – 2026 · *All rights reserved · Policy 986 AED license · 900 / 990 AED · MIT where applies.*
+
+Two front-ends ship in the same process:
+
+- **React + TypeScript + Vite** (default) — sources in [`web/`](web/), built to `static/dist/`. Used by `aiohttp`'s `/` handler when present.
+- **Vanilla JS modules** (fallback) — `static/js/` + `templates/index.html`. Used when Node/npm isn't available or the React build was skipped (`AEDI_SKIP_WEB_BUILD=1`).
 
 ---
 
@@ -59,6 +64,44 @@ Each ESP32-S3 node holds two pieces of state:
 2. **NVS config** — re-writable. The form maps 1:1 onto `firmware/esp32-csi-node/provision.py` flags. Re-running the NVS write **replaces the whole `csi_cfg` namespace** (issue #391), so the form always submits the full set.
 
 **Mesh multiplex.** 8-node deployment = 8 TDM slots. Node *N* gets `node_id N`, `tdm_slot N`, `tdm_total 8`. In each ~4 ms slot one node transmits and seven receive; over a 30 ms cycle every node is both TX and RX. The Provisioning tab's *Plan fleet* button auto-suggests the next free `node_id` / `tdm_slot` by looking at the live fleet table.
+
+## Front-end (React)
+
+The default UI is a single-page React app under [`web/`](web/), bundled with Vite.
+
+```bash
+cd aedi-sight-gui/web
+npm install --no-bin-links   # exFAT-safe; standard npm install on real filesystems
+npm run build                # → ../static/dist/index.html + assets/
+npm run dev                  # → http://localhost:5173 with /api + /ws proxied to :8088
+```
+
+The launcher (`launch.sh` / `install.sh`) runs the install + build automatically the first time it sees a missing `static/dist/`. Set `AEDI_SKIP_WEB_BUILD=1` to opt out and use the vanilla-JS UI instead. The server's `/` handler picks whichever is available, so iteration loops are: edit TSX → `npm run build` → reload.
+
+Project layout under `web/`:
+
+```
+web/
+├── index.html          # Vite entry — loads /src/main.tsx
+├── package.json        # react 18 · react-dom · typescript · vite · @vitejs/plugin-react
+├── tsconfig.json
+├── vite.config.ts      # base: /static/dist/ · outDir: ../static/dist
+└── src/
+    ├── main.tsx        # createRoot(...).render(<App/>)
+    ├── App.tsx         # shell · sidebar · tab routing · AppCtx provider
+    ├── types.ts        # mirrors every server contract
+    ├── hooks/
+    │   ├── useWebSocket.ts   # topic-multiplexed /ws bus with auto-reconnect
+    │   └── useApi.ts         # usePolled<T> + api<T>(method,url,body)
+    ├── components/
+    │   ├── Header.tsx        # gradient brand mark + status pills
+    │   └── Intro.tsx         # Canvas radar sweep → mesh → core pulse → IONITY lock-in
+    ├── lib/
+    │   ├── icons.tsx         # 16 inline-SVG icons as JSX
+    │   └── sparkline.tsx     # shared ring buffer + DPR canvas
+    └── tabs/                 # 13 tabs: Home Provision Sink Visualizer MLVitals
+                              #         Debug Chat Tools Libraries RuView Logs Updates About
+```
 
 ## Architecture
 
