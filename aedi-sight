@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Repo-root shim — delegates to the cross-platform launcher.
+# Lets you run `./aedi-sight` from the checkout root.
+DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+exec "$DIR/aedi-sight-gui/launch.sh" "$@"

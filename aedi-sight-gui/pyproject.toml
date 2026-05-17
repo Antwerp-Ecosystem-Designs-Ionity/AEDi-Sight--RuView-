@@ -1,0 +1,42 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "aedi-sight-gui"
+version = "0.5.0"
+description = "AEDi-Sight RuView — cross-platform WiFi-CSI sensing console (IONITY edition)"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.10"
+authors = [
+  { name = "Johan Wilhelm van Antwerp", email = "ai@ionity.today" },
+]
+keywords = ["wifi", "csi", "esp32", "sensing", "ionity", "aedi-sight"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Topic :: System :: Hardware",
+  "Topic :: Scientific/Engineering",
+]
+dependencies = [
+  "aiohttp >= 3.9",
+  "websockets >= 12",
+  "pyserial >= 3.5",
+  "esptool >= 5.0",
+  "esp_idf_nvs_partition_gen",
+  "numpy >= 1.26",
+  "scipy >= 1.11",
+]
+
+[project.urls]
+Homepage = "https://www.ionity.today"
+Source   = "https://github.com/Antwerp-Ecosystem-Designs-Ionity/AEDi-Sight--RuView-"
+
+[project.scripts]
+aedi-sight = "aedi_sight.__main__:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["aedi_sight"]

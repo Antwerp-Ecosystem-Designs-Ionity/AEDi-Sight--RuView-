@@ -1,0 +1,31 @@
+# AEDi-Sight RuView GUI — ignore runtime + build artefacts
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+dist/
+build/
+*.egg-info/
+
+# React / Vite
+web/node_modules/
+web/dist/
+static/dist/
+
+# Un-ignore the React app source dir — repo root has `lib/` ignored globally
+# (Python convention) which would otherwise sweep web/src/lib/ along.
+!web/src/lib/
+!web/src/lib/**
+
+# runtime state
+var/
+*.log
+
+# editor noise
+.vscode/
+.idea/
+*.swp
+.DS_Store
+*.tsbuildinfo

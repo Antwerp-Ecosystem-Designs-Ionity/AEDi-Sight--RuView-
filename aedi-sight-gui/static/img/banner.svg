@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 360" role="img" aria-label="AEDi-Sight RuView · WiFi-CSI sensing">
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0"   stop-color="#06080d"/>
+      <stop offset="0.5" stop-color="#0a1a3a"/>
+      <stop offset="1"   stop-color="#06080d"/>
+    </linearGradient>
+    <radialGradient id="sun" cx="0.8" cy="0.2" r="0.6">
+      <stop offset="0"   stop-color="#3a8bff" stop-opacity="0.4"/>
+      <stop offset="0.7" stop-color="#0a3df0" stop-opacity="0.05"/>
+      <stop offset="1"   stop-color="#000" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="wave" x1="0" x2="1">
+      <stop offset="0" stop-color="#3a8bff" stop-opacity="0"/>
+      <stop offset="0.5" stop-color="#3a8bff" stop-opacity="0.9"/>
+      <stop offset="1" stop-color="#3a8bff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="360" fill="url(#bg)"/>
+  <rect width="1200" height="360" fill="url(#sun)"/>
+
+  <!-- node mesh — 8 dots on a circle (the 8 ESP32s) -->
+  <g transform="translate(220 180)">
+    <circle r="120" fill="none" stroke="#3a8bff" stroke-width="0.6" opacity="0.4"/>
+    <g id="nodes">
+      <g><circle cx="120" cy="0" r="6" fill="#3a8bff"/><circle cx="120" cy="0" r="14" fill="#3a8bff" opacity="0.16"><animate attributeName="r" values="6;18;6" dur="3s" repeatCount="indefinite"/></circle></g>
+      <g transform="rotate(45)"><circle cx="120" cy="0" r="6" fill="#3a8bff"/></g>
+      <g transform="rotate(90)"><circle cx="120" cy="0" r="6" fill="#3a8bff"/><circle cx="120" cy="0" r="14" fill="#3a8bff" opacity="0.16"><animate attributeName="r" values="6;18;6" dur="3s" begin="0.4s" repeatCount="indefinite"/></circle></g>
+      <g transform="rotate(135)"><circle cx="120" cy="0" r="6" fill="#3a8bff"/></g>
+      <g transform="rotate(180)"><circle cx="120" cy="0" r="6" fill="#3a8bff"/><circle cx="120" cy="0" r="14" fill="#3a8bff" opacity="0.16"><animate attributeName="r" values="6;18;6" dur="3s" begin="0.8s" repeatCount="indefinite"/></circle></g>
+      <g transform="rotate(225)"><circle cx="120" cy="0" r="6" fill="#3a8bff"/></g>
+      <g transform="rotate(270)"><circle cx="120" cy="0" r="6" fill="#3a8bff"/><circle cx="120" cy="0" r="14" fill="#3a8bff" opacity="0.16"><animate attributeName="r" values="6;18;6" dur="3s" begin="1.2s" repeatCount="indefinite"/></circle></g>
+      <g transform="rotate(315)"><circle cx="120" cy="0" r="6" fill="#3a8bff"/></g>
+    </g>
+    <!-- TX node in center with a brighter glow -->
+    <circle r="14" fill="#ffffff"/>
+    <circle r="32" fill="#ffffff" opacity="0.06">
+      <animate attributeName="r" values="20;52;20" dur="2.2s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0.2;0.0;0.2" dur="2.2s" repeatCount="indefinite"/>
+    </circle>
+  </g>
+
+  <!-- CSI waterfall: a stack of pseudo-spectrum bars -->
+  <g transform="translate(580 70)">
+    <g font-family="-apple-system, 'Inter', sans-serif" fill="#ffffff">
+      <text x="0" y="0"  font-size="36" font-weight="700" letter-spacing="-0.6" >Sensing without cameras.</text>
+      <text x="0" y="32" font-size="16" opacity="0.7">8-node ESP32 TDMA mesh · channel-state radar · pose · vitals · presence</text>
+    </g>
+    <g transform="translate(0 70)" stroke="url(#wave)" stroke-width="1.6" fill="none">
+      <path d="M0 80 Q 60 30, 120 80 T 240 80 T 360 80 T 480 80 T 600 80"/>
+      <path d="M0 110 Q 60 60, 120 110 T 240 110 T 360 110 T 480 110 T 600 110" opacity="0.7"/>
+      <path d="M0 140 Q 60 90, 120 140 T 240 140 T 360 140 T 480 140 T 600 140" opacity="0.45"/>
+    </g>
+    <g transform="translate(0 240)" fill="#3a8bff">
+      <!-- subcarrier amplitudes (purely decorative) -->
+      <rect x="0"   width="6" height="32" opacity="0.8"/>
+      <rect x="14"  width="6" height="48" opacity="0.7"/>
+      <rect x="28"  width="6" height="18" opacity="0.6"/>
+      <rect x="42"  width="6" height="62" opacity="0.9"/>
+      <rect x="56"  width="6" height="40" opacity="0.7"/>
+      <rect x="70"  width="6" height="28" opacity="0.6"/>
+      <rect x="84"  width="6" height="56" opacity="0.85"/>
+      <rect x="98"  width="6" height="36" opacity="0.7"/>
+      <rect x="112" width="6" height="22" opacity="0.55"/>
+      <rect x="126" width="6" height="48" opacity="0.75"/>
+      <rect x="140" width="6" height="30" opacity="0.6"/>
+      <rect x="154" width="6" height="44" opacity="0.7"/>
+      <rect x="168" width="6" height="58" opacity="0.85"/>
+      <rect x="182" width="6" height="20" opacity="0.5"/>
+      <rect x="196" width="6" height="38" opacity="0.7"/>
+      <rect x="210" width="6" height="50" opacity="0.8"/>
+    </g>
+  </g>
+</svg>

@@ -8,6 +8,132 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`aedi-sight-gui` v0.5 — React 18 + TypeScript + Vite port of the front-end.**
+  Sub-project [`aedi-sight-gui/web/`](aedi-sight-gui/web/) is the canonical UI
+  going forward. Vanilla-JS modules in `aedi-sight-gui/static/js/*` remain as
+  the off-by-default fallback.
+  - **Stack**: React 18 · TypeScript · Vite. Vite emits to
+    `aedi-sight-gui/static/dist/`; the existing aiohttp `/static` fanout
+    serves the bundle. The server `/` handler prefers `static/dist/index.html`
+    over the legacy template when present.
+  - **Hooks**: `useWebSocket()` (topic-multiplexed, typed, auto-reconnect),
+    `usePolled<T>` + `api<T>()` (typed REST). Shared `types.ts` mirrors every
+    server contract (Status, SinkStats, CsiFrame, VitalsPayload, MlSnapshot,
+    LibsManifest, RuViewSnapshot, FleetSnapshot, SerialPort, …).
+  - **Components**: `<Intro/>` Canvas radar sweep → 8-node mesh → core pulse →
+    word lock-in animation. `<Header/>` gradient brand mark + 5 status pills.
+    `<Sparkline/>` shared ring-buffer canvas. 16 inline-SVG icons as JSX.
+  - **13 tabs** ported, all live-data backed: Home · Provision · Sink ·
+    Visualizer · MLVitals · Debug · Chat · Libraries · RuView · Tools · Logs ·
+    Updates · About.
+  - **Auto-build**: `launch.sh` + `install.sh` run `npm install --no-bin-links`
+    + `vite build` when Node/npm are present (exFAT-safe). `AEDI_SKIP_WEB_BUILD=1`
+    opts out. CI matrix unchanged (Ubuntu × macOS × Windows · py3.11 / py3.12).
+  - **Verified on Pi 5 / Debian / Node 24**: `npm install` adds 67 packages,
+    `vite build` emits a 199 KB JS bundle (62 KB gzipped) + 0.67 KB HTML,
+    server serves it from `/`, all `/api/*` endpoints respond 200.
+- **`aedi-sight-gui` v0.3 — scipy vitals, OTA reflash, persisted per-node settings, streaming chat, ML overlay on visualizer.**
+  Third-pass additions:
+  - **scipy vitals** (`aedi_sight/vitals.py`) — `scipy.signal.welch` on a rolling
+    per-node mean-amplitude buffer. Picks the dominant peak in the breathing
+    band (0.10–0.50 Hz / 6–30 BPM) and heart-rate band (0.80–3.00 Hz /
+    48–180 BPM). Resilient to variable frame rate: re-samples to the median
+    Δt, detrends, then Welch. Publishes on WS topic `vitals` once per second
+    with `breathing_bpm`, `heart_rate_bpm`, and per-band confidence. Verified
+    on a 30 Hz synthetic carrier — fs=29.83, picked heart_rate_bpm=55.9
+    against the injected 1.20 Hz tone.
+  - **OTA reflash flow** (`aedi_sight/ota.py`) — `POST /api/ota/reflash`
+    takes `{ip, variant?}`, reads the prebuilt firmware from
+    `firmware/esp32-csi-node/release_bins/`, and POSTs it as
+    `application/octet-stream` to `http://<ip>:8032/ota`. Progress streams
+    on the `log` topic. Per-node *reflash* buttons in the Sink tab gate the
+    call behind a JS `confirm()`. Error path returns HTTP 502 cleanly.
+  - **Per-node settings persistence** (`aedi_sight/state.py`) — every
+    successful provision call snapshots its non-secret args into
+    `var/fleet-state.json` (passwords explicitly stripped). The Provision
+    tab's "Plan fleet" / node-id change pre-fills the form from the saved
+    args. New endpoints `GET /api/fleet/state`, `POST /api/fleet/forget/{nid}`.
+  - **ML state + vitals overlay on Visualizer canvas** — top-left badge
+    box redraws every 500 ms showing per-node state (idle/moving/spike) +
+    σ score + BR/HR. Colour-coded (green idle, amber moving, red spike).
+  - **Streaming chat backend** (`aedi_sight/chat_stream.py`) —
+    `POST /api/chat/stream` spawns `claude-flow chat --stream` (or
+    `npx @claude-flow/cli@latest …`) as an async subprocess and streams
+    every stdout line back on the `chat` WS topic. Slash-commands still hit
+    the synchronous `/api/chat` for cheap local replies. Falls back to a
+    visible "claude-flow not installed" message when the CLI is absent.
+  - **Sink bug fix** carried over from v0.2.1 — consumers fire on every
+    frame; only the WS broadcast is rate-limited.
+- **`aedi-sight-gui` v0.2 — real local ML, ESP32 self-healing, CI, auto-update, bootstrap installer, branded assets.**
+  Second-pass enhancements on top of v0.1:
+  - **Real local ML** (`aedi_sight/local_ml.py`) — replaces the v0.1 stubs.
+    Per-subcarrier Welford running mean/variance and a Mahalanobis-distance
+    motion score on every live CSI frame. Three-state hysteresis-gated machine
+    (calibrating → idle → moving → spike). Verified end-to-end on synthetic
+    streams: calm 90-frame calibration → idle (0.94 σ) → 15 saturated frames →
+    *moving* (2.44 σ) → 30 calm frames → idle (0.37 σ). UI shows the live
+    per-node table.
+  - **ESP32 self-healing watchdog** (`aedi_sight/esp_watchdog.py`) — async
+    tick (2 s), marks nodes stale > 8 s, lost > 30 s, attempts a non-destructive
+    `GET http://<node>:8032/ota/status` probe when a node has been lost > 90 s.
+    Re-publishes status transitions on the `fleet` topic.
+  - **Tools auto-discovery** — `aedi_sight/tools.py` now walks `scripts/` and
+    `plugins/ruview/commands/`, builds a catalog of safe-to-invoke entries
+    (extracted from the first fenced bash block in each `.md` for the RuView
+    plugin). Verified: 69 items across 5 groups (Verification · Repo · ESP32 ·
+    RuView · scripts/).
+  - **CI** — `.github/workflows/aedi-sight-gui.yml` runs on every push touching
+    `aedi-sight-gui/`. Matrix: Ubuntu × macOS × Windows × {py3.11, py3.12}.
+    Linux job runs the full HTTP/WS/UDP smoke (start server, hit
+    `/api/status`, open `/ws`, inject ADR-018 frame, assert `csi` topic
+    delivers). Other OSes do byte-compile + import + ANSI splash smoke.
+  - **Auto-update on launch** — `launch.sh --auto-update` (or
+    `AEDI_AUTO_UPDATE=1`) runs `git pull --rebase --autostash` from the repo
+    root and re-execs the launcher with `--skip-auto-update` so the loop
+    can't recurse.
+  - **Bootstrap installer** — `install.sh` now detects missing `git` /
+    `python3.10+` and installs them via apt / dnf / pacman / zypper / apk /
+    brew / pkg (with `sudo` when not root). `--no-bootstrap` opts out.
+  - **Branded assets** — `static/img/ionity-logo.svg` (animated ripple word
+    mark) + `static/img/banner.svg` (8-node mesh + waveform + subcarriers).
+    Hero on the Home tab now displays the banner with the logo overlaid.
+- **`aedi-sight-gui/` — cross-platform sensing console (IONITY edition).**
+  New Python + vanilla-JS application that wraps the WiFi-CSI · ESP32 · ML
+  pipeline behind a single web UI. One process binds HTTP (`:8088`) and the UDP
+  CSI ingest (`:5005`); a single `/ws` multiplex carries `csi`, `log`,
+  `provision`, `fleet`, `ml`, `chat` topics. Tabs: Home · Provision · Sink ·
+  Visualizer · ML · Chat · Tools · Logs · Updates · About.
+  - **Provision** tab + backend wraps `python -m esptool ... write_flash`
+    (optional) and `firmware/esp32-csi-node/provision.py` with full mesh-aware
+    arguments — `--node-id 0..7`, `--tdm-slot 0..7`, `--tdm-total 8`,
+    `--channel`, `--edge-tier`, `--filter-mac`, `--dry-run`. "Plan fleet"
+    button auto-suggests the next free node-id from the live fleet table.
+  - **Sink** decodes ADR-018 binary CSI frames (magic `0xC5110001`, 20 B header
+    + `n_ant×n_sc` int8 I/Q) and republishes amplitude + phase over the WS
+    bus, rate-limited to ~10 Hz per node. Per-node stats: source, frames,
+    rolling 5-s rate, RSSI, last seq, last seen.
+  - **Visualizer** renders a scrolling subcarrier waterfall in canvas
+    (amplitude · phase · amp Δ modes).
+  - **Chat** is terminal-style; bridges to `claude-flow` CLI when
+    `ANTHROPIC_API_KEY` is set, falls back to local `/help`, `/ip`, `/ports`,
+    `/fleet`, `/status`, `/git status` commands.
+  - **Launcher scripts** — `launch.sh` (Linux/macOS), `launch.bat` +
+    `launch.ps1` (Windows). IONITY truecolor ANSI splash via
+    `aedi_sight.ansi`. Self-installs missing pip deps to the user site
+    (idempotent).
+  - **Installer** — `install.sh` / `install.ps1` clones the repo, installs
+    deps, drops a `~/.local/bin/aedi-sight` shim, writes a `.desktop` entry on
+    Linux / Start-menu shortcut on Windows.
+  - **Watchdog** — `--watchdog` flag re-spawns the server on any non-zero exit
+    with 1.6× backoff capped at 30 s.
+  - **REST API** — `/api/status`, `/api/serial-ports`, `/api/provision`,
+    `/api/sink/{start,stop,reset,stats}`, `/api/fleet`, `/api/ml/{models,job}`,
+    `/api/chat`, `/api/logs/recent`, `/api/git/{status,pull,fetch,log}`,
+    `/api/changelog`, `/api/tools`.
+  - **Theme** blue / white / black, animated SVG intro veil, SVG favicon.
+  - **License** MIT + IONITY Policy 986 / 900 / 990 AED addendum
+    (`aedi-sight-gui/LICENSE`). Author Johan Wilhelm van Antwerp · Antwerp
+    Designs 2018 – 2026.
 - **Real-time CSI introspection / low-latency tap on `wifi-densepose-sensing-server` (ADR-099).**
   New `wifi_densepose_sensing_server::introspection` module wires
   [midstream](https://github.com/ruvnet/midstream)'s `temporal-attractor` (Lyapunov +
